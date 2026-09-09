@@ -1,4 +1,4 @@
-# Implementing Markov Chain Monte Carlo Algorithbm for Multimodal Posterior Distributions
+# Implementing Markov Chain Monte Carlo Algorithms for Multimodal Posterior Distributions
 
 Markov Chain Monte Carlo (MCMC) algorithms constitute the standard tool for exploring posterior distributions in Bayesian inference and their convergence guarantees are asymptotic. In finite runtime, however, a chain explores the region of the parameter space surrounding a starting point, and when the posterior is multimodal this typically means a single mode. Convergence is assessed through between-chain diagnostics which detect this only when the chains happen to have settled in different modes; otherwise the output looks unremarkable.
 
