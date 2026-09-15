@@ -1,0 +1,175 @@
+---
+title: "Introduction to Hidden Markov Models"
+format: html
+engine: jupyter
+bibliography: references.bib
+---
+
+# Introduction
+
+Hidden Markov Models (HMMs) are a special type of state-space model in which the observed process depends on an underlying, unobserved (hidden) Markov chain. They were introduced in the late 1960s by Leonard Baum and colleagues at the Institute for Defense Analyses, originally under the name "probabilistic functions of Markov chains" — the term "Hidden Markov Model" came later. The framework stayed largely within engineering circles until the 1980s, when researchers at Bell Labs, most notably Lawrence Rabiner, built on it to create the first practical speech recognition systems; Rabiner's widely cited 1989 tutorial is what carried HMMs well beyond speech processing. Since then they have become a standard tool in bioinformatics, finance, ecology, and the social sciences, wherever a sequence of observations is thought to arise from an unobserved process switching between a small number of discrete states.
+
+In this notebook, we give an introduction to HMMs following specially [@zucchini2016], 
+
+# Definitions and notations
+
+An HMM is a state-space model with an observation process $\{Y_{t}\}$ and a state process $\{C_{t}\}$ that takes values in a finite set of states $\{1, ..., m\}$ [@zucchini2016]. 
+
+Regarding the state process, it is assumed to satisfy the Markov property:
+
+$$Pr(C_{t} \mid C_{1}, ..., C_{t-1}) = Pr(C_{t} \mid C_{t-1})$$
+
+That is, the probability of $C_{t}$ conditional on the whole history of the process is equivalent to the probability conditional only on the most recent value, $C_{t-1}$.
+
+It is also assumed that the observation process is conditionally independent of past values of both the state and observation processes, and depends only on the current value of the state process, $C_t$:
+
+$$Pr(Y_{t} \mid C_{1}, ..., C_{t}, Y_{1}, ..., Y_{t-1}) = Pr(Y_{t}\mid C_{t})$$
+
+<!-- Aquí habría que poner el diagrama de un HMM -->
+
+As an example, consider a two-state HMM in wich the state process is homogeneous and stationary with transition probability matrix $\Gamma =
+\begin{pmatrix}
+0.9 & 0.1 \\
+0.3 & 0.7
+\end{pmatrix}$. Also consider that $Y_{t}|C_t = 1 \sim N(0, 1)$ and $Y_{t}|C_t = 2 \sim N(2, 1)$. The following code snippet illustrates the behaviour of the state and observation processes. 
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+
+np.random.seed(0)
+
+# Transition probability matrix
+Gamma = np.array([[0.9, 0.1], [0.3, 0.7]])
+
+# Define the 
+m = 2
+states = np.arange(m)
+
+# Stationary distribution
+A = np.vstack([(Gamma.T - np.eye(m))[:-1], np.ones(m)])
+b = np.zeros(m); b[-1] = 1
+delta = np.linalg.solve(A, b)
+
+# Observaton process parameters
+mu = np.array([0, 2])
+sigma = np.array([1, 1])
+
+# Arrays for the results
+T = 100
+C = np.zeros(T, dtype=int)
+Y = np.zeros(T)
+
+# Initial values
+C[0] = np.random.choice(states, p=delta)
+Y[0] = np.random.normal(loc=mu[C[0]], scale=sigma[C[0]])
+
+for t in range(1, T):
+    # We choose
+    C[t] = np.random.choice(states, p=Gamma[C[t-1]])
+    Y[t] = np.random.normal(loc=mu[C[t]], scale=sigma[C[t]])
+
+
+# Plots
+fig, ax = plt.subplots(ncols=2, figsize=(10,5))
+
+ax[0].plot(np.arange(T), Y, color='#6B3EB8') # Observation process
+ax[0].set_title("Observation process")
+
+ax[1].scatter(np.arange(T), C, c='firebrick') # State process
+ax[1].set_title("State process")
+
+for i in range(2):
+    ax[i].spines["top"].set_visible(False)
+    ax[i].spines["right"].set_visible(False)
+    ax[i].grid(True, axis='y', linestyle='--', alpha=0.7)
+    ax[i].set_axisbelow(True)
+    ax[i].set_xlabel("Time")
+
+```
+
+## Loglikelihood
+
+<!-- Texto introductorio para la likelihood -->
+
+For observed data $y_1, ..., y_T$, we want to compute the likelihood $L_T$ — the probability of these particular observations arising from an $m$-state HMM with initial distribution $\delta$ and transition probability matrix $\Gamma$.
+
+To express $L_T$ compactly, for each observation $y_t$ we define an associated $m \times m$ diagonal matrix whose $i\text{-th}$ entry is the density (or probability) of $y_t$ under state $i = 1, ..., m$:
+
+$$\mathbf{P}(y_t) = \text{diag}\big(p_1(y_t), p_2(y_t), \dots, p_m(y_t)\big)$$
+
+Assuming that the Markov process is homogeneous and $\delta$ is the stationary distribution, we can demonstrate that the likelihood is given by 
+
+$$L_{T} = \boldsymbol{\delta P}(y_1)\boldsymbol{\Gamma P}(y_2)\dots\boldsymbol{\Gamma P}(y_t)\boldsymbol{1}'$$
+
+### Forward algorithm
+
+
+
+Given known values of $\boldsymbol{\delta}$ and $\boldsymbol{\Gamma}$ (and the state-dependent distributions), we can compute the likelihood recursively — an approach known as the "forward algorithm". This algorithm is useful because it allows us to avoid computing all $m^{T}$ possible trajectories.
+
+First, we define $\boldsymbol{\alpha}_t$ as the partial matrix product of the likelihood up to time $t$,
+
+$$\boldsymbol{\alpha}_{t} = \boldsymbol{\delta}\mathbf{P}(y_1)\boldsymbol{\Gamma}\mathbf{P}(y_2)\dots\boldsymbol{\Gamma}\mathbf{P}(y_t)$$
+
+With this convention, we have for time $1$,
+
+$$\boldsymbol{\alpha}_{1} = \boldsymbol{\delta}\mathbf{P}(y_1)$$
+
+and, for $t = 2, \dots, T$, the recursive relationship
+
+$$\boldsymbol{\alpha}_{t} = \boldsymbol{\alpha}_{t-1}\boldsymbol{\Gamma}\mathbf{P}(y_t)$$
+
+Finally, the likelihood is recovered by summing over the $m$ possible states at time $T$,
+
+$$L_T = \boldsymbol{\alpha}_{T}\mathbf{1}'$$
+
+Rather than expanding the full matrix product at once, the forward algorithm updates a single $1 \times m$ vector $\boldsymbol{\alpha}_t$ at each point in time. This reduces the computational cost of evaluating the likelihood from $O(m^T)$ to $O(Tm^2)$.
+
+```{python}
+import numpy as np
+from scipy.stats import norm
+
+np.random.seed(0)
+
+# Transition probability matrix
+Gamma = np.array([[0.9, 0.1], [0.3, 0.7]])
+
+m = 2
+states = np.arange(m)
+
+# Stationary distribution
+A = np.vstack([(Gamma.T - np.eye(m))[:-1], np.ones(m)])
+b = np.zeros(m); b[-1] = 1
+delta = np.linalg.solve(A, b)
+
+# Observation process parameters
+mu = np.array([0, 2])
+sigma = np.array([1, 1])
+
+# Simulate data
+T = 20
+C = np.zeros(T, dtype=int)
+Y = np.zeros(T)
+
+C[0] = np.random.choice(states, p=delta)
+Y[0] = np.random.normal(loc=mu[C[0]], scale=sigma[C[0]])
+
+for t in range(1, T):
+    C[t] = np.random.choice(states, p=Gamma[C[t-1]])
+    Y[t] = np.random.normal(loc=mu[C[t]], scale=sigma[C[t]])
+
+# Forward algorithm
+P1 = np.diag(norm.pdf(Y[0], loc=mu, scale=sigma))
+alpha = delta @ P1
+
+for t in range(1, T):
+    Pt = np.diag(norm.pdf(Y[t], loc=mu, scale=sigma))
+    alpha = alpha @ Gamma @ Pt
+
+L_T = alpha.sum()
+L_T
+```
+
+## Maximization of the likelihood
+

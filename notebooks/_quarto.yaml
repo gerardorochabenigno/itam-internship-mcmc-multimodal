@@ -1,0 +1,8 @@
+project:
+  type: default
+
+bibliography: references.bib
+
+format:
+  html:
+    toc: true
