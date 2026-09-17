@@ -88,7 +88,7 @@ for i in range(2):
 
 ```
 
-## Loglikelihood
+## Likelihood
 
 <!-- Texto introductorio para la likelihood -->
 
@@ -173,3 +173,206 @@ L_T
 
 ## Maximization of the likelihood
 
+In the previous code snippet, the likelihood came out to be practically zero. [@zucchini2016] explains that this happens because the likelihood is a product of matrices so the elements of $L_T$ tend to zero as $t$ grows larger for discrete state-dependent distributions, or possibly to infinity for continuous ones — exhibiting underflow or overflow, respectively. Moreover, since we are dealing with matrices rather than scalars, we cannot simply compute the log-likelihood as the sum of the logs of its factors.
+
+To overcome this, we can scale the likelihood by scaling $\boldsymbol{\alpha}$. To illustrate this, consider a stationary and homogeneous m-state HMM and define for $t=0, 1, ..., T$ the vector
+
+$$\boldsymbol{\phi}_t = \boldsymbol{\alpha}_t / w_t, \quad \text{where } w_t = \boldsymbol{\alpha}_t\mathbf{1}'$$
+
+with $\boldsymbol{\phi}_0 = \boldsymbol{\delta}$ and $w_0 = 1$. Since $\boldsymbol{\phi}_t$ is normalized to sum to 1, $w_t$ can be recovered recursively as
+
+$$w_t = w_{t-1}\big(\boldsymbol{\phi}_{t-1}\boldsymbol{\Gamma}\mathbf{P}(y_t)\mathbf{1}'\big)$$
+
+Because $L_T = w_T$, the log-likelihood is now a sum of scalars instead of a product of matrices,
+
+$$\log L_T = \sum_{t=1}^{T}\log(w_t/w_{t-1})$$
+
+At each step, we normalize $\boldsymbol{\alpha}_t$ to obtain $\boldsymbol{\phi}_t$, and accumulate the scaling factor $w_t$ on the log scale — avoiding underflow entirely. 
+
+```{python}
+np.random.seed(0)
+
+# Transition probability matrix
+Gamma = np.array([[0.9, 0.1], [0.3, 0.7]])
+
+m = 2
+states = np.arange(m)
+
+# Stationary distribution
+A = np.vstack([(Gamma.T - np.eye(m))[:-1], np.ones(m)])
+b = np.zeros(m); b[-1] = 1
+delta = np.linalg.solve(A, b)
+
+# Observation process parameters
+mu = np.array([0, 2])
+sigma = np.array([1, 1])
+
+# Simulate data
+T = 20
+C = np.zeros(T, dtype=int)
+Y = np.zeros(T)
+
+C[0] = np.random.choice(states, p=delta)
+Y[0] = np.random.normal(loc=mu[C[0]], scale=sigma[C[0]])
+
+for t in range(1, T):
+    C[t] = np.random.choice(states, p=Gamma[C[t-1]])
+    Y[t] = np.random.normal(loc=mu[C[t]], scale=sigma[C[t]])
+
+#hi = delta.copy()
+
+# Forward np.exp(algorithm with scalin)g
+phi = delta.copy()
+log_L_T = 0.0
+
+P0 = np.diag(norm.pdf(Y[0], loc=mu, scale=sigma))
+v = phi @ P0
+w = v.sum()
+log_L_T += np.log(w)
+phi = v / w
+
+for t in range(1, T):
+    Pt = np.diag(norm.pdf(Y[t], loc=mu, scale=sigma))
+    v = phi @ Gamma @ Pt
+    w = v.sum()
+    log_L_T += np.log(w)
+    phi = v / w
+
+print(np.exp(log_L_T))
+print(log_L_T)
+```
+
+In addition to underflow or overflow when computing the likelihood, computational problems can also arise when maximizing it — namely, slow convergence under constrained optimization, and the presence of multiple maxima in the likelihood surface.
+
+Parameter constraints appear, for example, in $\boldsymbol{\Gamma}$, since each row must sum to $1$ and every entry must be non-negative; they can also appear in the parameters of the state-dependent distributions (e.g., when a parameter can only take positive values). To avoid implementing these constraints directly, we can make use of reparametrization. 
+
+For the state-dependent distributions, the nature of the restriction indicates what kind of reparametrization we can use. For example, if the parameters $\boldsymbol{\theta}$ are positive, we can define $\boldsymbol{\theta}_{\log} = \log(\boldsymbol{\theta})$, maximize the likelihood with respect to $\boldsymbol{\theta}_{\log}$ to obtain $\hat{\boldsymbol{\theta}}_{\log}$, and then recover the original parameters by transforming back with $\hat{\boldsymbol{\theta}} = \exp(\hat{\boldsymbol{\theta}}_{\log})$. Similarly, when the parameters take values in the interval $(0,1)$, we can make use of the logit function instead.
+
+The transition probability matrix $\boldsymbol{\Gamma}$ requires a different treatment, since its constraint is not on individual entries but on entire rows: although $\boldsymbol{\Gamma}$ has $m^2$ entries, it has only $m(m-1)$ free parameters, because each row must sum to $1$. We call the unconstrained parameters $\tau_{ij}$ (for $i \neq j$) the **working parameters**, and the entries $\gamma_{ij}$ of $\boldsymbol{\Gamma}$ the **natural parameters** — the same terminology applies to $\log(\boldsymbol{\theta})$ versus $\boldsymbol{\theta}$ in the previous case.
+
+To go from working to natural parameters, define
+$$\nu_{ij} = \begin{cases} \exp(\tau_{ij}) & i \neq j \\ 1 & i = j \end{cases}$$
+
+and normalize each row so it sums to $1$,
+$$\gamma_{ij} = \nu_{ij} \Big/ \sum_{k=1}^{m}\nu_{ik}$$
+
+Since every $\nu_{ij} > 0$, this normalization guarantees $\gamma_{ij} \in (0,1)$ and $\sum_j \gamma_{ij} = 1$ automatically — the t.p.m. constraints are satisfied by construction, without ever having to impose them explicitly during optimization. Explicitly, for $i \neq j$,
+$$\gamma_{ij} = \frac{\exp(\tau_{ij})}{1 + \sum_{k \neq i}\exp(\tau_{ik})}$$
+
+To go in the opposite direction — recovering working parameters from an already-known $\boldsymbol{\Gamma}$ — we invert the transformation,
+$$\tau_{ij} = \log(\gamma_{ij}/\gamma_{ii}), \quad i \neq j$$
+
+As before, estimation proceeds in two steps: (1) maximize $L_T$ with respect to the unconstrained working parameters — $\{\tau_{ij}\}$, together with any other reparametrized parameters such as $\log\sigma_i$ — and (2) transform the resulting estimates back to the natural parameters $\hat{\boldsymbol{\Gamma}}$.
+
+```{python}
+from scipy.optimize import minimize
+
+np.random.seed(0)
+
+# Parámetros verdaderos
+Gamma = np.array([[0.9, 0.1], [0.3, 0.7]])
+m = 2
+states = np.arange(m)
+
+A = np.vstack([(Gamma.T - np.eye(m))[:-1], np.ones(m)])
+b = np.zeros(m); b[-1] = 1
+delta = np.linalg.solve(A, b)
+
+mu = np.array([0, 2])
+sigma = np.array([1, 1])
+
+# Simulación
+T = 5000
+C = np.zeros(T, dtype=int)
+Y = np.zeros(T)
+
+C[0] = np.random.choice(states, p=delta)
+Y[0] = np.random.normal(loc=mu[C[0]], scale=sigma[C[0]])
+
+for t in range(1, T):
+    C[t] = np.random.choice(states, p=Gamma[C[t-1]])
+    Y[t] = np.random.normal(loc=mu[C[t]], scale=sigma[C[t]])
+
+# Log-verosimilitud negativa
+def neg_log_likelihood(params):
+    tau = params[0:2]
+    mu_ = params[2:4]
+    sigma_ = np.exp(params[4:6])
+
+    Gamma_ = np.eye(m)
+    Gamma_[0, 1] = np.exp(tau[0])
+    Gamma_[1, 0] = np.exp(tau[1])
+    Gamma_ = Gamma_ / Gamma_.sum(axis=1, keepdims=True)
+
+    A_ = np.vstack([(Gamma_.T - np.eye(m))[:-1], np.ones(m)])
+    b_ = np.zeros(m); b_[-1] = 1
+    delta_ = np.linalg.solve(A_, b_)
+
+    phi = delta_.copy()
+    log_L_T = 0.0
+
+    P0 = np.diag(norm.pdf(Y[0], loc=mu_, scale=sigma_))
+    v = phi @ P0
+    w = v.sum()
+    log_L_T += np.log(w)
+    phi = v / w
+
+    for t in range(1, T):
+        Pt = np.diag(norm.pdf(Y[t], loc=mu_, scale=sigma_))
+        v = phi @ Gamma_ @ Pt
+        w = v.sum()
+        log_L_T += np.log(w)
+        phi = v / w
+
+    return -log_L_T
+
+# Optimización
+init_params = np.array([
+    0.0, 0.0,
+    np.mean(Y) - np.std(Y), np.mean(Y) + np.std(Y),
+    np.log(np.std(Y)), np.log(np.std(Y))
+])
+
+log_sigma_min = np.log(0.1 * np.std(Y))
+
+bounds = [
+    (None, None), (None, None),
+    (None, None), (None, None),
+    (log_sigma_min, None), (log_sigma_min, None)
+]
+
+result = minimize(neg_log_likelihood, init_params, method="L-BFGS-B", bounds=bounds)
+
+tau_hat = result.x[0:2]
+mu_hat = result.x[2:4]
+sigma_hat = np.exp(result.x[4:6])
+
+Gamma_hat = np.eye(m)
+Gamma_hat[0, 1] = np.exp(tau_hat[0])
+Gamma_hat[1, 0] = np.exp(tau_hat[1])
+Gamma_hat = Gamma_hat / Gamma_hat.sum(axis=1, keepdims=True)
+
+A_hat = np.vstack([(Gamma_hat.T - np.eye(m))[:-1], np.ones(m)])
+b_hat = np.zeros(m); b_hat[-1] = 1
+delta_hat = np.linalg.solve(A_hat, b_hat)
+
+print("Real Gamma:\n", Gamma)
+print("Estimated Gamma:\n", Gamma_hat)
+print()
+print("Real mu:   ", mu)
+print("Estimated mu:    ", mu_hat)
+print()
+print("Real sigma:", sigma)
+print("Estimated sigma: ", sigma_hat)
+print()
+print("Real delta:", delta)
+print("Estimated delta: ", delta_hat)
+```
+
+## Maximization of the likelihood using the Baum-Welch algorithm
+
+One of the most used algorithms for the MLE of the parameters of an HMM when the Markov process is homogeneous but not necessary stationary is the Baum-Welch algorithm wich is a special case of the Expectation-Maximization (EM) algorithm.
+
+The algorithm makes use of the forward probabilities $\boldsymbol{\delta}_{t}$ wich are
+
+$$\boldsymbol{\alpha}_{t} = \boldsymbol{\delta}\mathbf{P}(y_1)\boldsymbol{\Gamma}\mathbf{P}(y_2)\dots\boldsymbol{\Gamma}\mathbf{P}(y_t)$$
