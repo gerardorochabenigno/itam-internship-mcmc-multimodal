@@ -373,6 +373,36 @@ print("Estimated delta: ", delta_hat)
 
 One of the most used algorithms for the MLE of the parameters of an HMM when the Markov process is homogeneous but not necessary stationary is the Baum-Welch algorithm wich is a special case of the Expectation-Maximization (EM) algorithm.
 
-The algorithm makes use of the forward probabilities $\boldsymbol{\delta}_{t}$ wich are
+The algorithm makes use of the forward probabilities $\boldsymbol{\alpha}_{t}$ wich are
 
 $$\boldsymbol{\alpha}_{t} = \boldsymbol{\delta}\mathbf{P}(y_1)\boldsymbol{\Gamma}\mathbf{P}(y_2)\dots\boldsymbol{\Gamma}\mathbf{P}(y_t)$$
+
+and also the backward probabilities $\boldsymbol{\beta}_{t}$
+
+$$\boldsymbol{\beta}_{t} = \boldsymbol{\Gamma}\mathbf{P}(y_{t+1})\boldsymbol{\Gamma}\mathbf{P}(y_{t+2})\dots\boldsymbol{\Gamma}\mathbf{P}(y_{T})\bold{1}'$$
+
+Noting that the sequence of states of the Markov process of an HMM is not observed, we can treat those states as missing data and therefore use te EM algorithm, an algorithm useful in situations like this one.
+
+An informal way to describe the EM algorithm is that you start by choosing starting values of $\boldsymbol{\theta}$ and then repeat the **E-step** and **M-step** until some converfence criterion is reached:
+
+- **E-step**: compute the conditional expectations of the missing data given the observations and current estimate of $\boldsymbol{\theta}$.
+
+- **E-step**: Mazimize, with respect to $\boldsymbol{\theta}$. with the functions of the missing data repaced in it by their conditional expectations
+
+One disadvantage is that convergence is guaranteed locally.
+
+In the context of HMM, we represent the sequence of states $c_1, c_2, ..., c_t$ as zero-one random variables as follows:
+
+$$u_{j}=1 \text{ if and only if }c_{t}=j \text{ } (t = 1,...,T)$$
+
+and 
+
+$$v_{jk}(t)= 1 \text{ if and only if }c_{t}=j \text{ } (t = 2,...,T)$$
+
+With this, the log-likelihood of the observations $y_1,...,y{T}$ and the missing data $c_1,...,c{T}$;
+
+$$
+\begin{center}
+log\big(Pr(y_1, ..., y_T, c_1,...,c_T)\big) &= log\bigg(\delta c_{1}\prod\bigg)
+\end{center}
+$$
