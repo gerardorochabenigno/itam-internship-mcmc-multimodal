@@ -402,7 +402,127 @@ $$v_{jk}(t)= 1 \text{ if and only if }c_{t}=j \text{ } (t = 2,...,T)$$
 With this, the log-likelihood of the observations $y_1,...,y{T}$ and the missing data $c_1,...,c{T}$;
 
 $$
-\begin{center}
-log\big(Pr(y_1, ..., y_T, c_1,...,c_T)\big) &= log\bigg(\delta c_{1}\prod\bigg)
-\end{center}
+\log\big(\Pr(y_1,\ldots,y_T,c_1,\ldots,c_T)\big) = \log\left(\delta_{c_1}\prod_{t=2}^{T}\gamma_{c_{t-1}c_t}\prod_{t=1}^{T}p_{c_t}(y_t)\right)
 $$
+
+Using $v_{jk}(t)$ and $u_{j}=1$, the complete data loglikelihood is 
+
+$$
+\log\big(\Pr(\mathbf{x}^{(T)}, \mathbf{c}^{(T)})\big) = \sum_{j=1}^{m} u_j(1)\log\delta_j + \sum_{j=1}^{m}\sum_{k=1}^{m}\left(\sum_{t=2}^{T} v_{jk}(t)\right)\log\gamma_{jk} + \sum_{j=1}^{m}\sum_{t=1}^{T} u_j(t)\log p_j(x_t)
+$$
+
+and we can use this equation to estimate the parameters using the EM algorithm as follows:
+
+* **E-step** Estimate the conditional expectations $\hat{u}_{j}(t)$ and $\hat{v}_{jk}(t)$:
+
+$$\hat{u}_{j}(t) = \text{Pr}(C_{t} = j| y_1,...,y_{t}) = \frac{\alpha_{t}(j)\beta_{t}(j)}{L_t}$$
+
+and 
+
+$$\hat{v}_{jk}(t) = \text{Pr}(C_{t-1} = j, C_{t} = k | y_1,...,y_{t}) = \frac{\alpha_{t}(j)\beta_{t}(j)}{L_t}$$
+
+This quantities are used to replace the values $\hat{u}_{j}(t)$ and $\hat{v}_{jk}(t)$ in the log-likelihood formula.
+
+* **M-step** Once replaced the values $\hat{u}_{j}(t)$ and $\hat{v}_{jk}(t)$ by $\hat{u}_{j}(t)$ and $\hat{v}_{jk}(t)$, respectively, we maximize the CDLL with respect to $\boldsymbol{\delta}$, $\boldsymbol{\Gamma}$ and $\bold{p}(y)$. We note that the CDLL is a sum of three terms that do not share common terms so the maximization problem consist in maximizing three independent sums.
+
+    1. $\sum_{j=1}^m\hat{u}_{j}(t)\text{ log}(\delta_{j})$ with respect to $\boldsymbol{\delta}$;
+    2. $\sum_{j=1}^{m} \sum_{k=1}^{m}\big(\sum_{t=2}^{T}\hat{v}_{jk}(t)\big)\text{ log}\gamma_{jk}$ with respect to $\boldsymbol{\Gamma}$; 
+    3. $\sum_{j=1}^{m} \sum_{t=1}^{T}\hat{u}_{j}(t)\text{ log }p_j(y_t)$ with respect to the parameters of the state-dependent distributions. 
+
+
+The solution of this problem is:
+
+ - Set $\delta_{j} = \frac{\hat{u}_{j}(1)}{\sum_{j=1}^{m}}=\hat{u}_{j}(1)$
+- Set $\gamma_{jk} = f_{jk} \Big/ \sum_{k=1}^{m} f_{jk}$, where $f_{jk} = \sum_{t=2}^{T} \hat v_{jk}(t)$
+- The maximization of the third term depend on the structure of the state-dependent distributions.
+
+The following code snippet is a naive implementation of the EM-algorithm applied to the example we have followed in this notebook
+
+```{python}
+np.random.seed(0)
+
+Gamma = np.array([[0.9, 0.1], [0.3, 0.7]])
+m = 2
+states = np.arange(m)
+
+A = np.vstack([(Gamma.T - np.eye(m))[:-1], np.ones(m)])
+b = np.zeros(m); b[-1] = 1
+delta = np.linalg.solve(A, b)
+
+mu = np.array([0, 2])
+sigma = np.array([1, 1])
+
+T = 1000
+C = np.zeros(T, dtype=int)
+Y = np.zeros(T)
+
+C[0] = np.random.choice(states, p=delta)
+Y[0] = np.random.normal(loc=mu[C[0]], scale=sigma[C[0]])
+
+for t in range(1, T):
+    C[t] = np.random.choice(states, p=Gamma[C[t-1]])
+    Y[t] = np.random.normal(loc=mu[C[t]], scale=sigma[C[t]])
+
+# Starting values for the EM
+delta_hat = np.array([0.5, 0.5])
+Gamma_hat = np.array([[0.5, 0.5], [0.5, 0.5]])
+mu_hat = np.array([np.mean(Y) - np.std(Y), np.mean(Y) + np.std(Y)])
+sigma_hat = np.array([np.std(Y), np.std(Y)])
+
+max_iter = 200
+tol = 1e-6
+log_L_prev = -np.inf
+
+for iteration in range(max_iter):
+
+    #  Scaled forward 
+    alpha_hat = np.zeros((T, m))
+    w = np.zeros(T)
+
+    P0 = norm.pdf(Y[0], loc=mu_hat, scale=sigma_hat)
+    v = delta_hat * P0
+    w[0] = v.sum()
+    alpha_hat[0] = v / w[0]
+
+    for t in range(1, T):
+        Pt = norm.pdf(Y[t], loc=mu_hat, scale=sigma_hat)
+        v = (alpha_hat[t-1] @ Gamma_hat) * Pt
+        w[t] = v.sum()
+        alpha_hat[t] = v / w[t]
+
+    log_L = np.log(w).sum()
+
+    # Scaled backward
+    beta_hat = np.zeros((T, m))
+    beta_hat[T-1] = 1.0
+
+    for t in range(T-2, -1, -1):
+        Pt1 = norm.pdf(Y[t+1], loc=mu_hat, scale=sigma_hat)
+        beta_hat[t] = (Gamma_hat @ (Pt1 * beta_hat[t+1])) / w[t+1]
+
+    #  E-step
+    u_hat = alpha_hat * beta_hat  
+
+    v_hat = np.zeros((T, m, m))
+    for t in range(1, T):
+        Pt = norm.pdf(Y[t], loc=mu_hat, scale=sigma_hat)
+        v_hat[t] = (alpha_hat[t-1][:, None] * Gamma_hat * Pt[None, :] * beta_hat[t][None, :]) / w[t]
+
+    # M-step 
+    delta_hat = u_hat[0].copy()
+
+    f = v_hat[1:].sum(axis=0)
+    Gamma_hat = f / f.sum(axis=1, keepdims=True)
+
+    peso = u_hat.sum(axis=0)  # total weight per state
+    mu_hat = (u_hat * Y[:, None]).sum(axis=0) / peso
+    sigma_hat = np.sqrt((u_hat * (Y[:, None] - mu_hat)**2).sum(axis=0) / peso)
+
+    log_L_prev = log_L
+
+print("delta_hat:", delta_hat)
+print("Gamma_hat:\n", Gamma_hat)
+print("mu_hat:", mu_hat)
+print("sigma_hat:", sigma_hat)
+print("log-likelihood:", log_L)
+```
