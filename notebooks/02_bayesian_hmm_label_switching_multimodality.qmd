@@ -1,0 +1,170 @@
+---
+title: "Bayesian Hidden Markov Models, label switching and genuine multimodality"
+format: html
+engine: jupyter
+bibliography: references.bib
+---
+
+# 1. Introduction
+
+Inte previous notebook we gave an introduction to Hidden MArkov Models (HMMs), the maximum likelihood estimation vía the forward algorithm and the EM algorithm version for the estimation of HMM. We focused on the fudamentals and we use primary tools in the code snippetsinstead of specificly designed libraries for the estimation of HMM using the fquentist approach.
+
+In this notebook, our focus is to expand the theory of HMM by introduciong the Bayesian approach which treats the parameters of the Markov process and the state-dependent distributions as random variables. As we will illustrate later, an advantadge of the Bayesian approach over the frequentist approach is that maximum likelihood estimations can get stuck on a single point when it is possible that posterior distributions (that is the distribution of the parameters) present multiple local maxima. 
+
+Here we expand the theory by introducing a Bayesian approach to HMM, the label switching problem and genuine multimdality.
+
+
+# 2. Bayesian HMM
+
+The Bayesian approach relies on Bayes' theorem, which states that the conditional distribution of a set of random variables $\boldsymbol{\theta}$ given a set of observations $\mathbf{y}$, called the posterior distribution, is equal to the product of the prior distribution of the parameters $p(\boldsymbol{\theta})$ and the conditional distribution of the observations given the parameters $p(\mathbf{y} \mid \boldsymbol{\theta})$, divided by the marginal distribution of $\mathbf{y}$, $p(\mathbf{y}) = \int p(\boldsymbol{\theta})\, p(\mathbf{y} \mid \boldsymbol{\theta})\, d\boldsymbol{\theta}$, which ensures that the posterior integrates to one [@gelman2013bda, ch. 1]:
+
+$$
+p(\boldsymbol{\theta} \mid \mathbf{y}) = \frac{p(\boldsymbol{\theta})\, p(\mathbf{y} \mid \boldsymbol{\theta})}{p(\mathbf{y})}.
+$${#eq-bayes}
+
+Recall that $p(\mathbf{y} \mid \boldsymbol{\theta})$, viewed as a function of $\boldsymbol{\theta}$ for fixed observations, is the likelihood function $L(\boldsymbol{\theta} \mid \mathbf{y})$. Moreover, since the normalizing constant $p(\mathbf{y})$ does not depend on $\boldsymbol{\theta}$, it can be omitted, and Bayes' theorem can be written as the posterior being proportional to the product of the likelihood and the prior:
+
+$$
+p(\boldsymbol{\theta} \mid \mathbf{y}) \propto L(\boldsymbol{\theta} \mid \mathbf{y})\, p(\boldsymbol{\theta}).
+$$ {#eq-posterior-unnorm}
+
+This last expression is the core of Bayesian inference. In most models of practical interest, the integral defining $p(\mathbf{y})$ has no closed form and cannot be computed numerically in high dimensions, so the posterior is only available up to a normalizing constant. Several methods have been developed to perform Bayesian inference under this limitation, among which Markov chain Monte Carlo (MCMC) methods stand out given that only require evaluating the unnormalized posterior in @eq-posterior-unnorm, since the normalizing constant cancels out when comparing the posterior density at two different values of $\boldsymbol{\theta}$ [@gelman2013bda, ch. 10].
+
+## 2.1 Parameters and prior distributions of a Bayesian HMM
+
+Recall that an HMM is a state-space model consisting of an observation process $\{Y_t\}$ and an unobserved Markov process $\{C_t\}$ taking values in a finite set of states $\{1, \dots, m\}$ [@zucchini2016]. The realization of the observation process, $\mathbf{y} = (y_1, \dots, y_T)$, is the data on which the posterior in @eq-bayes is conditioned.
+
+The parameters governing $\{C_t\}$ are the initial distribution $\boldsymbol{\delta}$ and the transition probability matrix $\boldsymbol{\Gamma}$, while each of the $m$ state-dependent distributions, also known as emission distributions, has its own parameters $\boldsymbol{\eta}_j$, $j = 1, \dots, m$. We collect all of them in the parameter vector
+
+$$
+\boldsymbol{\theta} = (\boldsymbol{\delta}, \boldsymbol{\Gamma}, \boldsymbol{\eta}_1, \dots, \boldsymbol{\eta}_m),
+$$
+
+so that specifying a Bayesian HMM amounts to specifying a prior distribution $p(\boldsymbol{\theta})$ over each of these components.
+
+Regarding the initial distribution $\boldsymbol{\delta}$ if it is stationary, then it can be derived from $\boldsymbol{\Gamma}$ so it leaves $\boldsymbol{\theta}$. In this notebook we make the assumption that the Markov process is homogeneous and stationary.
+
+### 2.1.1 Transition probability matrix $\boldsymbol{\Gamma}$
+
+Each row of the transition probability matrix, $\boldsymbol{\gamma}_i = (\gamma_{i1}, \dots, \gamma_{im})$ for $i = 1, \dots, m$, is a vector of non-negative entries that sum to one. In other words, it belongs to the probability *simplex*
+
+$$
+\Delta^{m-1} = \left\{ \mathbf{x} \in \mathbb{R}^m : x_j \geq 0,\ \sum_{j=1}^{m} x_j = 1 \right\},
+$$
+
+the $(m-1)$-dimensional set of all probability distributions over $m$ elements [@boyd2004convex, p. 33]. A natural choice for the prior for vectors in $\Delta^{m-1}$ is the Dirichlet distribution, whose support is precisely this set [@frigyik2010dirichlet]. We therefore assume that the rows of $\boldsymbol{\Gamma}$ are independent and that each follows a Dirichlet distribution,
+
+$$
+\boldsymbol{\gamma}_i \sim \text{Dir}(\boldsymbol{\tau}_i), \qquad \boldsymbol{\tau}_i = (\tau_{i1}, \dots, \tau_{im}), \quad \tau_{ij} > 0,
+$$
+
+with density
+
+$$
+p(\boldsymbol{\gamma}_i \mid \boldsymbol{\tau}_i) = \frac{1}{B(\boldsymbol{\tau}_i)} \prod_{j=1}^{m} \gamma_{ij}^{\tau_{ij} - 1},
+\qquad
+B(\boldsymbol{\tau}_i) = \frac{\prod_{j=1}^{m} \Gamma(\tau_{ij})}{\Gamma\left(\sum_{j=1}^{m} \tau_{ij}\right)},
+$$ {#eq-dirichlet}
+
+where $\Gamma(\cdot)$ denotes the gamma function and does not have to be confused with the transition probability matrix $\boldsymbol{\Gamma}$.
+
+The concentration parameters $\boldsymbol{\tau}_i$ control the shape of this prior. They determine its mean, $E[\gamma_{ij}] = \tau_{ij} / \tau_{i0}$ with $\tau_{i0} = \sum_{j=1}^{m} \tau_{ij}$, and how concentrated it is around that mean: the larger $\tau_{i0}$, the more informative the prior.
+
+Following [@leosbarajas2018] and [@gallegosherrada2026], we set $\boldsymbol{\tau}_i = \mathbf{1}_m$ for all rows. Besides its simplicity, this choice treats all states symmetrically, so the prior is invariant to a relabeling of the states; the consequences of this property are discussed in @sec-label-switching. Under this choice, @eq-dirichlet reduces to
+
+$$
+p(\boldsymbol{\gamma}_i \mid \boldsymbol{\tau}_i = \mathbf{1}_m) = \frac{\Gamma(m)}{\prod_{j=1}^{m} \Gamma(1)} \prod_{j=1}^{m} \gamma_{ij}^{0} = (m-1)!, \qquad \boldsymbol{\gamma}_i \in \Delta^{m-1}.
+$$ {#eq-dirichlet-uniform}
+
+Since this density does not depend on $\boldsymbol{\gamma}_i$, the $\text{Dir}(\mathbf{1}_m)$ prior is uniform on the simplex, with the constant $(m-1)!$ being the reciprocal of the volume of $\Delta^{m-1}$. Uniformity on the simplex, however, does not imply uniformity on each entry: the marginal prior of each $\gamma_{ij}$ is $\text{Beta}(1, m-1)$, which places more mass near zero as $m$ grows. In particular, it favors a priori low persistence in each state, i.e., small values of $\gamma_{ii}$.
+
+### 2.1.2 Initial distribution $\boldsymbol{\delta}$
+
+Since the entries of the initial distribution $\boldsymbol{\delta}$ must add to one and are all non-negative, it also has support on the probability simplex $\Delta^{m-1}$. 
+
+We can treat $\boldsymbol{\delta}$ as a free parameter with its own prior distribution or to assume that the Markov process is stationary, so that $\boldsymbol{\delta}$ is its stationary distribution.
+
+Stationarity means that the chain is already in equilibrium when the observation process starts, so the distribution of the states does not change from one time point to the next [@zucchini2016]
+
+$$
+\boldsymbol{\delta} \boldsymbol{\Gamma} = \boldsymbol{\delta}, \qquad \sum_{j=1}^{m} \delta_j = 1.
+$$ {#eq-stationary}
+
+When the chain is irreducible, that is, when every state can be reached from any other state within a finite number of steps, the stationary distribution exists and is unique [@sargent2022networks, Theorem 4.1.1]. 
+
+Under the $\text{Dir}(\mathbf{1}_m)$ prior of $\boldsymbol{\Gamma}$, this condition holds with probability one: since the Dirichlet distribution is continuous on the simplex, no entry $\gamma_{ij}$ is exactly zero with probability one, so every state can be reached from any other in a single step. The stationary distribution is then given by
+
+$$
+\boldsymbol{\delta} = \mathbf{1}_m \left( \mathbf{I}_m - \boldsymbol{\Gamma} + \mathbf{U} \right)^{-1},
+$$ {#eq-stationary-solution}
+
+where $\mathbf{1}_m$ is a row vector of ones, $\mathbf{I}_m$ is the $m \times m$ identity matrix and $\mathbf{U}$ is the $m \times m$ matrix of ones [@zucchini2016]. Under the stationarity assumption, $\boldsymbol{\delta}$ is no longer a parameter but a deterministic function of $\boldsymbol{\Gamma}$, so it requires no prior of its own: its prior distribution is the one induced by the prior on the rows of $\boldsymbol{\Gamma}$.
+
+In this notebook we assume that the observation process starts when the chain is stationary and hence $\boldsymbol{\delta}$ is the stationary distribution. 
+
+### 2.1.3 State-dependent distributions
+
+Unlike the transition probabilities, the parameters of the state-dependent distributions do not share a common support, so there is no single prior that applies to every model. However, the choice can be guided by the support of each parameter. For example, real-valued parameters such as means call for priors on $\mathbb{R}$, while positive parameters such as standard deviations or rates call for priors on $(0, \infty)$.
+
+Another criterion for choosing priors is the algorithm used to draw samples from the posterior distribution. Gibbs samplers commonly rely on conjugate priors, which yield posterior conditional distributions in closed form given the hidden states. *Stan*, which we use later in this notebook, does not require conjugacy, so priors can be chosen for what they express rather than for their algebraic convenience.
+
+When the state-dependent distributions are normal, the conjugate choice is a normal prior on each mean $\mu_j$ and an inverse-gamma prior on each variance $\sigma_j^2$ [@gelman2013bda]. However, inverse-gamma priors with small parameters can be highly influential when a state has few observations, so weakly informative priors on the standard deviation, such as a half-normal or half-$t$ distribution, are often preferred [@gelman2006prior; @leosbarajas2018]. When the observations are counts modeled with a Poisson distribution in each state, a gamma prior on each rate $\lambda_j$ is a natural choice, both because it is conjugate and because it has the appropriate support, although in *Stan* only the latter matters. 
+
+In this notebook we work with normal state-dependent distributions and use
+
+$$
+\mu_j \sim \mathcal{N}(\mu_0, s_0^2), \qquad \sigma_j \sim \text{half-}\mathcal{N}(0, s_1^2), \qquad j = 1, \dots, m.
+$$ {#eq-emission-priors}
+
+Two features of these priors are important for what follows. First, the same prior is assigned to the parameters of every state, as was done for the rows of $\boldsymbol{\Gamma}$, so that no state is distinguished a priori. The consequences of this choice are discussed in @sec-exchangeability. Second, the priors are weakly informative rather than vague. In mixture models and HMMs, improper or nearly flat priors on the state-dependent parameters can lead to improper posterior distributions, since there is always a configuration in which some state is assigned no observations and the data provide no information about its parameters [@fruhwirth2006].
+
+## 2.2 Likelihood via the forward algorithm
+
+The last element needed to assemble the unnormalized posterior distribution is the likelihood. In the previous notebook we showed that, by summing over all possible sequences of hidden states, the likelihood of an HMM can be written as the matrix product
+
+$$
+L_T = \boldsymbol{\delta}\, \mathbf{P}(y_1)\, \boldsymbol{\Gamma}\, \mathbf{P}(y_2) \cdots \boldsymbol{\Gamma}\, \mathbf{P}(y_T)\, \mathbf{1}_m^\top,
+$$ {#eq-likelihood}
+
+where $\mathbf{P}(y) = \text{diag}\big(p_1(y), \dots, p_m(y)\big)$ is the diagonal matrix of state-dependent densities evaluated at $y$ [@zucchini2016]. In the notation of this notebook, $L_T = L(\boldsymbol{\theta} \mid \mathbf{y})$, and under the stationarity assumption $\boldsymbol{\delta}$ is the function of $\boldsymbol{\Gamma}$ given in @eq-stationary-solution. The forward algorithm evaluates @eq-likelihood at a cost that grows linearly in $T$, instead of the $m^T$ terms of the explicit sum over state sequences. In practice, the recursion is carried out on the log scale, since the product of $T$ densities quickly underflows to zero [@leosbarajas2018].
+
+Assuming that the rows of $\boldsymbol{\Gamma}$ and the parameters of each state are a priori independent, the log of the unnormalized posterior in @eq-posterior-unnorm becomes
+
+$$
+\log p(\boldsymbol{\theta} \mid \mathbf{y}) = \log L(\boldsymbol{\theta} \mid \mathbf{y}) + \sum_{i=1}^{m} \log \text{Dir}(\boldsymbol{\gamma}_i \mid \mathbf{1}_m) + \sum_{j=1}^{m} \log p(\boldsymbol{\eta}_j) + \text{const.}
+$$ {#eq-log-posterior}
+
+No term for $\boldsymbol{\delta}$ appears, since under stationarity it carries no prior of its own. Each term of @eq-log-posterior corresponds to one statement in the Stan program presented below.
+
+## 2.3 Exchangeable priors and posterior symmetry {#sec-exchangeability}
+
+
+
+## 2.4 Implementation in Stan
+
+# 3. Simulated data
+
+## 3.1 Scenario A: well-separated states
+
+## 3.2 Scenario B: weakly separated states
+
+# 4 Label switching {#sec-label-switching}
+
+## 4.1 Permutation invariance of the likelihood
+
+## 4.2 What it looks like in practice: multiple chains, R-hat, traceplots
+
+## 4.3 Remedies: ordering constraints, post-hoc relabeling, invariant quantities
+
+# 5 Genuine multimodality
+## 5.1Definition: modes that are not permutations of each other
+
+## 5.2 Detecting it after relabeling
+
+## 5.3 Why it matters for inference
+
+## 5.4 Why multiple chains are not enough
+
+# 6 Final remarks
+
+# References
