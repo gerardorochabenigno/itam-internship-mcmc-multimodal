@@ -204,6 +204,197 @@ To draw samples from the posterior distribution of the HMM we use *Stan*, a popu
 
 *Stan* makes Bayesian inference by using Hamiltonian Monte Carlo (HMC), an MCMC method that relies on techniques from differential geometry to generate transitions spanning the full marginal variance, eliminating the random component of other classes of MCMC algorithms such as Metropolis-Hastings and Gibbs samplers [@betancourt2013hamiltonian].
 
+To illustrate the ideas presented so far, we use univariate data simulated from a 2-state HMM with a moderately persistent transition probability matrix $\boldsymbol{\Gamma} = \begin{pmatrix} 0.8 & 0.2 \\ 0.3 & 0.7 \end{pmatrix}$, whose stationary distribution $\boldsymbol{\delta} = (0.6,\ 0.4)$ is used as the initial distribution. The state-dependent distributions are normal with well-separated means, $\mu_1 = -2$ and $\mu_2 = 2$, and a common variance $\sigma^2 = 1$. We simulate $T = 500$ observations. These values are summarized in @tbl-sim-params.
+
+::: {#tbl-sim-params style="width: 50%; margin: auto;"}
+
+| Parameter | Value |
+|:---:|:---:|
+| $m$ | $2$ |
+| $\boldsymbol{\mu}$ | $(-2,\ 2)$ |
+| $\boldsymbol{\sigma}$ | $(1,\ 1)$ |
+| $\boldsymbol{\Gamma}$ | $\begin{pmatrix} 0.8 & 0.2 \\ 0.3 & 0.7 \end{pmatrix}$ |
+| $\boldsymbol{\delta}$ | $(0.6,\ 0.4)$ |
+| $T$ | $500$ |
+
+Parameters used to simulate the HMM.
+
+:::
+
+Here is the *Python* code for the simulation but keep in mind that Stan programs require data to be stored in objects.
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Seed for reproducibility
+np.random.seed(0)
+
+# States
+m = 2
+states = np.arange(m)
+
+# Transition probability matrix
+Gamma = np.array([[0.8, 0.2], [0.3, 0.7]])
+
+# Stationary distribution
+delta = np.array([0.6, 0.4])
+
+# Observaton process parameters
+mu = np.array([-2, 2])
+sigma = np.array([1, 1])
+
+# Arrays for the results
+T = 500
+C = np.zeros(T, dtype=int) # Vector to store the state sequence
+Y = np.zeros(T) # Vector to store the simulated data
+
+# Initial values
+C[0] = np.random.choice(states, p=delta)
+Y[0] = np.random.normal(loc=mu[C[0]], scale=sigma[C[0]])
+
+for t in range(1, T):
+    C[t] = np.random.choice(states, p=Gamma[C[t-1]])
+    Y[t] = np.random.normal(loc=mu[C[t]], scale=sigma[C[t]])
+
+# Plot the data
+fig, ax = plt.subplots(ncols = 2, figsize=(10,5))
+
+ax[0].plot(np.arange(T), Y, color='#77918e', linestyle="-.") # Observation process
+ax[0].set_title("Simulated data from a two state HMM")
+
+
+bins = np.linspace(Y.min(), Y.max(), 31)
+
+ax[1].hist(Y[C == 0], bins=bins, alpha=0.7, color="#ac65c2", label="State 1")
+ax[1].hist(Y[C == 1], bins=bins, alpha=0.7, color="#eba834", label="State 2")
+ax[1].set_xlabel("$y_t$")
+ax[1].set_ylabel("Frequency")
+ax[1].set_xlabel("$y_t$")
+ax[1].set_title("Histograms of the simulated data")
+ax[1].legend(frameon=False)
+
+for i in range(2):
+    ax[i].spines["top"].set_visible(False)
+    ax[i].spines["right"].set_visible(False)
+    ax[i].grid(True, axis='y', linestyle='--', alpha=0.7)
+    ax[i].set_axisbelow(True)
+    
+
+# Save the data in a tabular format for illustration process
+t = np.arange(1, T + 1)
+np.savetxt(
+    "../data/02_hmm_2state.csv",
+    np.column_stack([t, C + 1, Y]),
+    delimiter=",",
+    header="t,C,y",
+    comments="",
+    fmt=["%d", "%d", "%.6f"],
+)
+
+# Simulation checks
+print("Proportion of tie in each state")
+print("State 1:", float(np.sum(C))/T)
+print("State 2:", 1-float(np.sum(C))/T)
+
+
+# Save the data for stan in JSON
+from cmdstanpy import write_stan_json
+
+write_stan_json("../data/02_hmm_2state.json", {"T": T, "m": m, "y": Y})
+
+```
+
+Since the estarionary distribution 
+
+Here is the *Stan* code for the model
+
+```{.stan filename="stan/02_hmm.stan"}
+// data
+data {
+  int<lower=1> T;  // number of observations
+  int<lower=1> m;  // number of states
+  array[T] real y;  // observations, y coincides with the name in stan_data
+}
+
+// parameters
+parameters{
+    array[m] real mu;                   // means of state dependent distributions
+    array[m] real <lower=0> sigma;      // standard deviation of state dependent distributions
+    array[m] simplex[m] gamma;          // rows of Gamma, gamma[i] is the i-th row 
+    
+}
+
+// transformed parameters
+transformed parameters{
+    matrix[m,m] Gamma;
+    row_vector<lower=0, upper=1>[m] delta;
+
+
+    for (i in 1:m){
+        Gamma[i] = gamma[i]';
+    }
+    delta = rep_row_vector(1, m)/(identity_matrix(m) - Gamma + rep_matrix(1,m,m));
+}
+
+// model
+model{
+
+    vector[m] log_alpha;
+
+    // Prior of the means
+    mu ~ normal(0,5);
+
+    // Prior of the deviation
+    sigma ~ normal(0,2); // Restriction on sigma guarantees this is half normal
+
+    // Prior of Gamma
+    for (i in 1:m){
+        gamma[i] ~ dirichlet(rep_vector(1,m));
+    }
+
+    // initialize forward log-weights
+    for (j in 1:m) {
+        log_alpha[j] = log(delta[j]) + normal_lpdf(y[1] | mu[j], sigma[j]);
+    }
+
+    // Verosimilitud
+    for (t in 2:T){
+        vector[m] log_alpha_new;
+        for (j in 1:m){
+            log_alpha_new[j] = log_sum_exp(log_alpha + log(Gamma[, j])) + normal_lpdf(y[t] | mu[j], sigma[j]);
+        }
+        log_alpha = log_alpha_new;        
+    }
+    target += log_sum_exp(log_alpha);
+}
+```
+
+To compile the model, execute the following *Python* code
+
+```{python}
+from cmdstanpy import CmdStanModel
+import pandas as pd
+
+# Load and prepare the data 
+df = pd.read_csv("../data/02_hmm_2state.csv")
+
+stan_data = {
+    "T": df.shape[0],
+    "y": df["y"].to_numpy(),
+    "m":2
+}
+
+# Compile the stan model
+model = CmdStanModel(stan_file="../stan/02_ex1_normal.stan")
+
+# Execute the sampler
+fit = model.sample(data=stan_data, chains=8, parallel_chains=8, seed=123)
+
+# print the summary
+fit.summary()
+```
+
 
 
 # 3. Simulated data
