@@ -165,9 +165,7 @@ window.Quarto = {
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
-      MCMC for multimodal posteriors
-      </li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./01_hmm_intro.html">Introduction to Hidden Markov Models</a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
       <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
@@ -199,8 +197,11 @@ window.Quarto = {
   </div>
 </li>
         <li class="sidebar-item">
- <span class="menu-text">01_hmm_intro.qmd</span>
-  </li>
+  <div class="sidebar-item-container"> 
+  <a href="./01_hmm_intro.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Introduction to Hidden Markov Models</span></a>
+  </div>
+</li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./02_bayesian_hmm_label_switching_multimodality.html" class="sidebar-item-text sidebar-link">
@@ -254,7 +255,7 @@ window.Quarto = {
 0.9 &amp; 0.1 \\
 0.3 &amp; 0.7
 \end{pmatrix}\)</span>. Also consider that <span class="math inline">\(Y_{t}|C_t = 1 \sim N(0, 1)\)</span> and <span class="math inline">\(Y_{t}|C_t = 2 \sim N(2, 1)\)</span>. The following code snippet illustrates the behaviour of the state and observation processes.</p>
-<div id="2080ac92" class="cell" data-execution_count="1">
+<div id="c999eb24" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -309,7 +310,7 @@ window.Quarto = {
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="01_hhm_intro_files/figure-html/cell-2-output-1.png" width="793" height="451" class="figure-img"></p>
+<p><img src="01_hmm_intro_files/figure-html/cell-2-output-1.png" width="793" height="451" class="figure-img"></p>
 </figure>
 </div>
 </div>
@@ -334,7 +335,7 @@ window.Quarto = {
 <p>Finally, the likelihood is recovered by summing over the <span class="math inline">\(m\)</span> possible states at time <span class="math inline">\(T\)</span>,</p>
 <p><span class="math display">\[L_T = \boldsymbol{\alpha}_{T}\mathbf{1}'\]</span></p>
 <p>Rather than expanding the full matrix product at once, the forward algorithm updates a single <span class="math inline">\(1 \times m\)</span> vector <span class="math inline">\(\boldsymbol{\alpha}_t\)</span> at each point in time. This reduces the computational cost of evaluating the likelihood from <span class="math inline">\(O(m^T)\)</span> to <span class="math inline">\(O(Tm^2)\)</span>.</p>
-<div id="05308a1b" class="cell" data-execution_count="2">
+<div id="d660c939" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.stats <span class="im">import</span> norm</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -393,7 +394,7 @@ window.Quarto = {
 <p>Because <span class="math inline">\(L_T = w_T\)</span>, the log-likelihood is now a sum of scalars instead of a product of matrices,</p>
 <p><span class="math display">\[\log L_T = \sum_{t=1}^{T}\log(w_t/w_{t-1})\]</span></p>
 <p>At each step, we normalize <span class="math inline">\(\boldsymbol{\alpha}_t\)</span> to obtain <span class="math inline">\(\boldsymbol{\phi}_t\)</span>, and accumulate the scaling factor <span class="math inline">\(w_t\)</span> on the log scale — avoiding underflow entirely.</p>
-<div id="f47d59ed" class="cell" data-execution_count="3">
+<div id="173a4ffa" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>np.random.seed(<span class="dv">0</span>)</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Transition probability matrix</span></span>
@@ -458,7 +459,7 @@ window.Quarto = {
 <p>Since every <span class="math inline">\(\nu_{ij} &gt; 0\)</span>, this normalization guarantees <span class="math inline">\(\gamma_{ij} \in (0,1)\)</span> and <span class="math inline">\(\sum_j \gamma_{ij} = 1\)</span> automatically — the t.p.m. constraints are satisfied by construction, without ever having to impose them explicitly during optimization. Explicitly, for <span class="math inline">\(i \neq j\)</span>, <span class="math display">\[\gamma_{ij} = \frac{\exp(\tau_{ij})}{1 + \sum_{k \neq i}\exp(\tau_{ik})}\]</span></p>
 <p>To go in the opposite direction — recovering working parameters from an already-known <span class="math inline">\(\boldsymbol{\Gamma}\)</span> — we invert the transformation, <span class="math display">\[\tau_{ij} = \log(\gamma_{ij}/\gamma_{ii}), \quad i \neq j\]</span></p>
 <p>As before, estimation proceeds in two steps: (1) maximize <span class="math inline">\(L_T\)</span> with respect to the unconstrained working parameters — <span class="math inline">\(\{\tau_{ij}\}\)</span>, together with any other reparametrized parameters such as <span class="math inline">\(\log\sigma_i\)</span> — and (2) transform the resulting estimates back to the natural parameters <span class="math inline">\(\hat{\boldsymbol{\Gamma}}\)</span>.</p>
-<div id="206de239" class="cell" data-execution_count="4">
+<div id="aac689b2" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.optimize <span class="im">import</span> minimize</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>np.random.seed(<span class="dv">0</span>)</span>
@@ -629,7 +630,7 @@ Estimated delta:  [0.74942785 0.25057215]</code></pre>
 <li>The maximization of the third term depend on the structure of the state-dependent distributions.</li>
 </ul>
 <p>The following code snippet is a naive implementation of the EM-algorithm applied to the example we have followed in this notebook</p>
-<div id="713fc00c" class="cell" data-execution_count="5">
+<div id="c491d6e4" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>np.random.seed(<span class="dv">0</span>)</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>Gamma <span class="op">=</span> np.array([[<span class="fl">0.9</span>, <span class="fl">0.1</span>], [<span class="fl">0.3</span>, <span class="fl">0.7</span>]])</span>
