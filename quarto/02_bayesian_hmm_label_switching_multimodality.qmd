@@ -220,7 +220,7 @@ To draw samples from the posterior distribution of the HMM we use *Stan*, a popu
 
 ## 4.3 Remedies: ordering constraints, post-hoc relabeling, invariant quantities
 
-# 5 Genuine multimodality
+# 5 Genuine multimodality {#sec-genuine-multimodality}
 ## 5.1Definition: modes that are not permutations of each other
 
 ## 5.2 Detecting it after relabeling
