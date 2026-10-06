@@ -1,0 +1,19 @@
+
+---
+title: "Implementing Markov Chain Monte Carlo Algorithms for Multimodal Posterior Distributions"
+subtitle: "Applications in Hidden Markov Models and Markov Switching Models"
+author: "itam-internship"
+date: last-modified
+---
+ 
+## About this project
+ 
+Markov Chain Monte Carlo (MCMC) algorithms constitute the standard tool for exploring posterior distributions in Bayesian inference and their convergence guarantees are asymptotic. In finite runtime, however, a chain explores the region of the parameter space surrounding a starting point, and when the posterior is multimodal this typically means a single mode. Convergence is assessed through between-chain diagnostics which detect this only when the chains happen to have settled in different modes; otherwise the output looks unremarkable.
+
+In hidden Markov models (HMMs) and Markov switching models (MSMs) multimodality arises from the likelihood itself because the states are exchangeable, so permuting the labels leaves the likelihood unchanged. Under an exchangeable prior the posterior inherits this symmetry, so the chain can then move between equivalent labellings, which makes state-specific posterior summaries meaningless. This problem is called label switching.
+
+Even after correcting for label switching the posterior can remain multimodal with modes corresponding to different segmentations of the data rather than relabelling of the same one. Parallel tempering (PT) is a class of MCMC algorithms that addresses multimodality by running several chains along a sequence of tempered distributions and swapping states between them, improving the exploration between modes.
+
+While PT is well developed theoretically, materials on implementing it are scarce. To reduce this gap, this repository documents a workflow for exploring multimodal posteriors with Stan, Pigeons.jl and emcee, using HMMs and MSMs as the working example. The notebooks cover how the algorithms work, common pitfalls and practical guidelines for people fitting these models.
+
+ 
