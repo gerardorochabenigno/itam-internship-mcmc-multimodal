@@ -1,0 +1,16 @@
+project:
+  type: website
+  output-dir: ../docs
+
+website:
+  title: "MCMC for multimodal posteriors"
+  sidebar:
+    contents:
+      - index.qmd
+      - 01_hmm_intro.qmd
+      - 02_bayesian_hmm_label_switching_multimodality.qmd
+
+bibliography: references.bib
+
+execute:
+  freeze: auto
