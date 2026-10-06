@@ -7,7 +7,7 @@ website:
   sidebar:
     contents:
       - index.qmd
-      - 01_hhm_intro.qmd
+      - 01_hmm_intro.qmd
       - 02_bayesian_hmm_label_switching_multimodality.qmd
 
 bibliography: references.bib
