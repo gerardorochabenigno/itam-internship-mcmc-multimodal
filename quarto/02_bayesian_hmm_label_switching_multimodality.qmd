@@ -30,7 +30,7 @@ $$ {#eq-posterior-unnorm}
 
 This last expression is the core of Bayesian inference. In most models of practical interest, the integral defining $p(\mathbf{y})$ has no closed form and cannot be computed numerically in high dimensions, so the posterior is only available up to a normalizing constant. Several methods have been developed to perform Bayesian inference under this limitation, among which Markov chain Monte Carlo (MCMC) methods stand out given that only require evaluating the unnormalized posterior in @eq-posterior-unnorm, since the normalizing constant cancels out when comparing the posterior density at two different values of $\boldsymbol{\theta}$ [@gelman2013bda, ch. 10].
 
-## 2.1 Parameters and prior distributions of a Bayesian HMM
+## 2.1 Parameters and prior distributions of a Bayesian HMM {#sec-priors}
 
 Recall that an HMM is a state-space model consisting of an observation process $\{Y_t\}$ and an unobserved Markov process $\{C_t\}$ taking values in a finite set of states $\{1, \dots, m\}$ [@zucchini2016]. The realization of the observation process, $\mathbf{y} = (y_1, \dots, y_T)$, is the data on which the posterior in @eq-bayes is conditioned.
 
@@ -221,7 +221,7 @@ Parameters used to simulate the HMM.
 
 :::
 
-Here is the *Python* code for the simulation but keep in mind that Stan programs require data to be stored in objects.
+The following *Python* code simulates the data from the HMM in @tbl-sim-params and stores it in the `data/` folder at the root of the repository. The file contains the observations $y_t$ together with the true hidden states $C_t$, which are not used for inference but allow us to assess the results later. We keep the simulation and the inference as separate steps, so that the model reads the data from a file exactly as it would in a real application, without access to how the data were generated. This also allows the same dataset to be reused in the following notebooks.
 
 ```{python}
 import numpy as np
@@ -305,9 +305,15 @@ write_stan_json("../data/02_hmm_2state.json", {"T": T, "m": m, "y": Y})
 
 ```
 
-Since the estarionary distribution 
 
-Here is the *Stan* code for the model
+In order to perform Bayesian inference with *Stan*, the model should be written a program stored in a file with the extension `.stan`. A *Stan* program does not describe how to sample from the posterior. Instead, it specifies the log of the unnormalized posterior density in @eq-log-posterior, and *Stan* computes its gradient automatically and explores it with the No-U-Turn Sampler, a variant of Hamiltonian Monte Carlo [@carpenter2017]. The program is organized in blocks that must appear in a fixed order. In this notebook we use four of them.
+
+- `data` declares the quantities that are passed to the program and remain fixed, such as the number of observations and the observations themselves.
+- `parameters` declares the unknown quantities whose posterior distribution we want to explore. Constraints on these declarations, such as positivity , define the space in which the sampler moves.
+- `transformed parameters` defines quantities computed deterministically from the parameters, which are recomputed at each iteration and stored in the output alongside the parameters.
+- `model` specifies the prior distributions and the likelihood, whose contributions are added to the log density.
+
+The complete model is presented below and we will described each block.
 
 ```{.stan filename="stan/02_hmm.stan"}
 // data
@@ -370,32 +376,201 @@ model{
 }
 ```
 
-To compile the model, execute the following *Python* code
+
+```{.stan filename="stan/02_hmm.stan"}
+// data
+data {
+  int<lower=1> T;  // number of observations
+  int<lower=1> m;  // number of states
+  array[T] real y;  // observations, y coincides with the name in stan_data
+}
+
+// parameters
+parameters{
+    array[m] real mu;                   // means of state dependent distributions
+    array[m] real <lower=0> sigma;      // standard deviation of state dependent distributions
+    array[m] simplex[m] gamma;          // rows of Gamma, gamma[i] is the i-th row 
+    
+}
+
+// transformed parameters
+transformed parameters{
+    matrix[m,m] Gamma;
+    row_vector<lower=0, upper=1>[m] delta;
+
+
+    for (i in 1:m){
+        Gamma[i] = gamma[i]';
+    }
+    delta = rep_row_vector(1, m)/(identity_matrix(m) - Gamma + rep_matrix(1,m,m));
+}
+
+// model
+model{
+
+    vector[m] log_alpha;
+
+    // Prior of the means
+    mu ~ normal(0,5);
+
+    // Prior of the deviation
+    sigma ~ normal(0,2); // Restriction on sigma guarantees this is half normal
+
+    // Prior of Gamma
+    for (i in 1:m){
+        gamma[i] ~ dirichlet(rep_vector(1,m));
+    }
+
+    // initialize forward log-weights
+    for (j in 1:m) {
+        log_alpha[j] = log(delta[j]) + normal_lpdf(y[1] | mu[j], sigma[j]);
+    }
+
+    // Verosimilitud
+    for (t in 2:T){
+        vector[m] log_alpha_new;
+        for (j in 1:m){
+            log_alpha_new[j] = log_sum_exp(log_alpha + log(Gamma[, j])) + normal_lpdf(y[t] | mu[j], sigma[j]);
+        }
+        log_alpha = log_alpha_new;        
+    }
+    target += log_sum_exp(log_alpha);
+}
+```
+
+We start with the `data` block, where we declare the number of observations $T$, the number of states $m$ and the observations $\mathbf{y}$. *Stan* is statically typed, so every variable must be declared together with its type. Here $T$ and $m$ are integers and $\mathbf{y}$ is an array of $T$ real numbers. The constraint `<lower=1>` states that $T$ and $m$ must be at least one. In the `data` block, constraints act as checks, so *Stan* stops with an error if the data passed to the program do not satisfy them. Note also that the names declared in this block must match exactly the keys of the dictionary passed from *Python*.
+
+```{.stan}
+data {
+  int<lower=1> T;   // number of observations
+  int<lower=1> m;   // number of states
+  array[T] real y;  // observations
+}
+```
+
+The `parameters` block declares the unknown quantities whose posterior distribution we want to explore. Here we declare the means $\mu_j$ and standard deviations $\sigma_j$ of the state-dependent distributions, and the rows $\boldsymbol{\gamma}_i$ of the transition probability matrix $\boldsymbol{\Gamma}$. Unlike in the `data` block, constraints here define the space explored by the sampler. The constraint `<lower=0>` restricts each $\sigma_j$ to positive values, and the type `simplex[m]` restricts each row of $\boldsymbol{\Gamma}$ to the probability simplex $\Delta^{m-1}$ defined in @sec-priors, so that its entries are non-negative and sum to one. *Stan* enforces these constraints internally by transforming the parameters to an unconstrained space. Note that the initial distribution $\boldsymbol{\delta}$ is not declared here, since under the stationarity assumption it is a deterministic function of $\boldsymbol{\Gamma}$ and is computed in the next block.
+
+```{.stan}
+parameters {
+  array[m] real mu;              // means of the state-dependent distributions
+  array[m] real<lower=0> sigma;  // standard deviations of the state-dependent distributions
+  array[m] simplex[m] gamma;     // rows of Gamma, gamma[i] is the i-th row
+}
+```
+The `transformed parameters` block defines quantities that are computed deterministically from the parameters. They are recomputed at every iteration of the sampler and stored in the output, so their posterior distribution can be summarized in the same way as that of the parameters. Here we compute two such quantities. First, we assemble the transition probability matrix $\boldsymbol{\Gamma}$ from its rows. Since each `gamma[i]` is a column vector while the rows of a matrix are row vectors, each row is transposed with the operator `'` before being assigned. Second, we compute the stationary distribution $\boldsymbol{\delta}$ using @eq-stationary-solution. Instead of inverting the matrix $\mathbf{I}_m - \boldsymbol{\Gamma} + \mathbf{U}$ explicitly, we use the right division operator `/`, which solves the corresponding linear system and is numerically more stable. The constraint `<lower=0, upper=1>` on `delta` does not restrict the sampler, as it does in the `parameters` block, but acts as a check. If the computed values fall outside this range, which can happen when $\boldsymbol{\Gamma}$ is numerically close to a reducible matrix, *Stan* rejects the proposal and continues sampling.
+
+```{.stan}
+transformed parameters {
+  matrix[m, m] Gamma;                       // transition probability matrix
+  row_vector<lower=0, upper=1>[m] delta;    // stationary distribution
+
+  for (i in 1:m) {
+    Gamma[i] = gamma[i]';
+  }
+  delta = rep_row_vector(1, m) / (identity_matrix(m) - Gamma + rep_matrix(1, m, m));
+}
+```
+
+The `model` block specifies the two components of the log posterior in @eq-log-posterior, namely the prior distributions of the parameters declared in the `parameters` block and the likelihood. We use the following priors, which correspond to @eq-emission-priors with $\mu_0 = 0$, $s_0 = 5$ and $s_1 = 2$.
+
+- A $\mathcal{N}(0, 5^2)$ prior for each mean $\mu_j$.
+- A half-$\mathcal{N}(0, 2^2)$ prior for each standard deviation $\sigma_j$, obtained by combining a normal distribution centered at zero with the constraint `<lower=0>` declared in the `parameters` block.
+- A $\text{Dir}(\mathbf{1}_m)$ prior for each row of $\boldsymbol{\Gamma}$, stored in the array `gamma`.
+
+These priors are weakly informative, since their scales are wide relative to the scale of the data, and they are the same for every state, so the prior is exchangeable in the sense of @sec-exchangeability. No prior is placed on $\boldsymbol{\delta}$, which under the stationarity assumption is computed from $\boldsymbol{\Gamma}$ in the `transformed parameters` block. 
+
+Once defined the priors on the parameters, the likelihood is evaluated with the forward algorithm. *Stan* actually evaluates the log-likelihood and in order to undertand the code, we write the formula here
+
+Once the priors are specified, the likelihood is evaluated with the forward algorithm. Let $\alpha_t(j)$ denote the joint probability of the observations $y_1, \dots, y_t$ and of being in state $j$ at time $t$. The forward algorithm computes these quantities recursively, and the likelihood is obtained by summing them over the states at the final time $T$ [@zucchini2016]. 
+
+Since the product of many densities quickly underflows to zero, *Stan* works with logarithms, so the recursion is written in terms of $\ell_t(j) = \log \alpha_t(j)$. The forward algorithm, however, requires adding probabilities, and the logarithm of a sum is not the sum of the logarithms. Given the logarithms $x_1, \dots, x_m$ of several probabilities, the logarithm of their sum is
+
+$$
+\text{LSE}(x_1, \dots, x_m) = \log \sum_{i=1}^{m} e^{x_i},
+$$ {#eq-lse}
+
+which *Stan* implements as `log_sum_exp`. 
+
+For the forward algorithm, we first declare the vector `log_alpha` and initialize it for the first observation
+
+$$
+\ell_1(j) = \log \delta_j + \log p_j(y_1), \qquad j = 1, \dots, m,
+$$ {#eq-forward-init}
+
+Next, for $t = 2, \dots, T$, we update each $\ell_t(j)$ as
+
+$$
+\ell_t(j) = \text{LSE}\big(\ell_{t-1}(1) + \log \gamma_{1j}, \dots, \ell_{t-1}(m) + \log \gamma_{mj}\big) + \log p_j(y_t), \qquad j = 1, \dots, m.
+$$ {#eq-forward-step}
+
+Finally, the log-likelihood is obtained by applying the log-sum-exp function in @eq-lse to the values at the last time point,
+
+$$
+\log L(\boldsymbol{\theta} \mid \mathbf{y}) = \text{LSE}\big(\ell_T(1), \dots, \ell_T(m)\big),
+$$ {#eq-forward-final}
+
+and it is added to `target`, the variable in which *Stan* accumulates the log posterior density. Together with the contributions of the priors, `target` then holds the value of @eq-log-posterior at the current value of the parameters.
+
+```{.stan}
+model{
+
+    vector[m] log_alpha;
+
+    // Prior of the means
+    mu ~ normal(0,5);
+
+    // Prior of the deviation
+    sigma ~ normal(0,2); // Restriction on sigma guarantees this is half normal
+
+    // Prior of Gamma
+    for (i in 1:m){
+        gamma[i] ~ dirichlet(rep_vector(1,m));
+    }
+
+    // initialize forward log-weights
+    for (j in 1:m) {
+        log_alpha[j] = log(delta[j]) + normal_lpdf(y[1] | mu[j], sigma[j]);
+    }
+
+    // Verosimilitud
+    for (t in 2:T){
+        vector[m] log_alpha_new;
+        for (j in 1:m){
+            log_alpha_new[j] = log_sum_exp(log_alpha + log(Gamma[, j])) + normal_lpdf(y[t] | mu[j], sigma[j]);
+        }
+        log_alpha = log_alpha_new;        
+    }
+    target += log_sum_exp(log_alpha);
+}
+```
+
+
+we have a *Stan* model and now we have to fit it.  To fit the model from *Python*, we first load the simulated data and arrange them in a dictionary whose keys match the names declared in the `data` block. Note that the true hidden states stored in the file are not passed to *Stan*, since in a real application they would not be observed. We then compile the program with *CmdStanPy*, which translates it into *C++* and builds an executable. Compilation can take about a minute the first time, but the executable is reused in later runs as long as the `.stan` file does not change.
 
 ```{python}
 from cmdstanpy import CmdStanModel
 import pandas as pd
 
-# Load and prepare the data 
+# Load and prepare the data
 df = pd.read_csv("../data/02_hmm_2state.csv")
 
 stan_data = {
     "T": df.shape[0],
+    "m": 2,
     "y": df["y"].to_numpy(),
-    "m":2
 }
 
-# Compile the stan model
+# Compile the Stan program
 model = CmdStanModel(stan_file="../stan/02_ex1_normal.stan")
-
-# Execute the sampler
-fit = model.sample(data=stan_data, chains=8, parallel_chains=8, seed=123)
-
-# print the summary
-fit.summary()
 ```
 
 
+We then draw samples from the posterior with the `sample` method. We run eight chains in parallel, each starting from a different random initial value, and fix the seed so that the results are reproducible. By default, each chain performs 1000 warmup iterations, which are used to tune the sampler and are discarded, followed by 1000 sampling iterations. The `summary` method reports, for each parameter, the posterior mean and quantiles together with the convergence diagnostics $\hat{R}$ and the effective sample size.
+
+```{python}
+fit = model.sample(data=stan_data, chains=8, parallel_chains=8, seed=123)
+fit.summary()
+```
 
 # 3. Simulated data
 
