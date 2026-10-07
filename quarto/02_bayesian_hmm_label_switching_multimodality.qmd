@@ -138,7 +138,7 @@ No term for $\boldsymbol{\delta}$ appears, since under stationarity it carries n
 
 ## 2.3 Exchangeable priors and posterior symmetry {#sec-exchangeability}
 
-In this section we show that relabeling the hidden states leaves the posterior unchanged. This follows from the likelihood being invariant to the labels and from the priors being exchangeable, that is, treating all states in the same way [@jasra2005]. The resulting symmetry is what distinguishes the modes due to relabeling (@sec-label-switching) from genuinely different ones (@sec-genuine-multimodality).
+In this section we show that relabeling the hidden states leaves the posterior unchanged. This follows from the likelihood being invariant to the labels and from the priors being exchangeable, that is, treating all states in the same way [@jasra2005]. The resulting symmetry is what distinguishes the modes due to relabeling from genuinely different ones.
 
 Consider an HMM with $m$ states and label them *state 1*, *state 2*, ..., *state m*. Note that this labeling from a mathematical perspective is irrelevant since the name *state 1* initially assigned to a specific state can be assigned to any other state and the same goes to every other state. Under this situation, you can obtain $m!$ different labelings.
 
@@ -196,9 +196,9 @@ $$ {#eq-posterior-symmetry}
 
 A posterior satisfying @eq-posterior-symmetry is said to be symmetric with respect to the labels, since every point $\boldsymbol{\theta}$ has $m!$ counterparts $\nu(\boldsymbol{\theta})$ with exactly the same posterior density.
 
-Although relabeling leaves the posterior unchanged, it becomes problematic in practice when the posterior is explored with MCMC methods. By @eq-posterior-symmetry, the marginal posterior distributions of the state-dependent parameters coincide across states, so that, for instance, $\mu_1$ and $\mu_2$ have the same marginal posterior. A sampler that has converged to this symmetric posterior therefore moves between the $m!$ symmetric regions of high posterior density, and averages of state-specific quantities, such as the posterior mean of $\mu_1$, become meaningless [@jasra2005; @papastamoulis2016]. This phenomenon is known as *label switching* and is discussed in @sec-label-switching.
+Although relabeling leaves the posterior unchanged, it becomes problematic in practice when the posterior is explored with MCMC methods. By @eq-posterior-symmetry, the marginal posterior distributions of the state-dependent parameters coincide across states, so that, for instance, $\mu_1$ and $\mu_2$ have the same marginal posterior. A sampler that has converged to this symmetric posterior therefore moves between the $m!$ symmetric regions of high posterior density, and averages of state-specific quantities, such as the posterior mean of $\mu_1$, become meaningless [@jasra2005; @papastamoulis2016]. This phenomenon is known as *label switching* and methods for alleviating this phenomenon are discussed in @sec-label-switching.
 
-## 2.4 Implementation in Stan
+## 2.4 Implementation in Stan {#sec-stan-implementation}
 
 To draw samples from the posterior distribution of the HMM we use *Stan*, a popular open-source probabilistic programming language designed for specifying statistical models and performing Bayesian inference [@carpenter2017]. Models are written in *Stan*'s own language and can be run from several environments through interfaces such as *CmdStanPy* for *Python*, *CmdStanR* for *R* and *Stan.jl* for *Julia*. In this notebook we use *CmdStanPy*. Details on installation and usage are available on the official [website](https://mc-stan.org) and in the introductory tutorial by @carpenter2023.
 
@@ -544,8 +544,7 @@ model{
 }
 ```
 
-
-we have a *Stan* model and now we have to fit it.  To fit the model from *Python*, we first load the simulated data and arrange them in a dictionary whose keys match the names declared in the `data` block. Note that the true hidden states stored in the file are not passed to *Stan*, since in a real application they would not be observed. We then compile the program with *CmdStanPy*, which translates it into *C++* and builds an executable. Compilation can take about a minute the first time, but the executable is reused in later runs as long as the `.stan` file does not change.
+We have a *Stan* model and now we have to fit it.  To fit the model from *Python*, we first load the simulated data and arrange them in a dictionary whose keys match the names declared in the `data` block. Note that the true hidden states stored in the file are not passed to *Stan*, since in a real application they would not be observed. We then compile the program with *CmdStanPy*, which translates it into *C++* and builds an executable. Compilation can take about a minute the first time, but the executable is reused in later runs as long as the `.stan` file does not change.
 
 ```{python}
 from cmdstanpy import CmdStanModel
@@ -572,29 +571,89 @@ fit = model.sample(data=stan_data, chains=8, parallel_chains=8, seed=123)
 fit.summary()
 ```
 
-# 3. Simulated data
+Let's analyze the results from thge summary starting with the convergence diagnostic $\hat{R}$, which compares the variance of the draws between chains with the variance within each chain. Values close to one indicate that all chains explored the same distribution, and @vehtari2021 recommend $\hat{R} < 1.01$, although a looser threshold of $1.05$ is also commonly used.
 
-## 3.1 Scenario A: well-separated states
+In our example, only the standard deviations $\sigma_j$ have $\hat{R}$ close to one, while the means $\mu_j$, the transition probabilities in $\boldsymbol{\Gamma}$ and the stationary distribution $\boldsymbol{\delta}$ show values above 1.6 and require more discussion. 
 
-## 3.2 Scenario B: weakly separated states
+Since the true standard deviations are equal in both states, swapping the labels leaves them unchanged, whereas the means take different values in each state. The high $\hat{R}$ therefore indicates that different chains settled on different labelings of the states, which is confirmed by the value of $\hat{R}$ close to one for `lp__`, since all chains reach regions of the same posterior density.
 
-# 4 Label switching {#sec-label-switching}
+Now, let's see the summary statistics of the parameters. The posterior means of $\mu_1$ and $\mu_2$ are closer to zero rather than near their true values of $-2$ and $2$, while their 5th and 95th percentiles are close to $-2$ and $2$. The draws therefore concentrate around both true values, depending on the chain, and the posterior mean falls between them, at a value that no chain actually visits. 
 
-## 4.1 Permutation invariance of the likelihood
+This phenomenon is known as **label switching**. It is a consequence of the posterior symmetry in @eq-posterior-symmetry, whereby every mode has $m!$ copies that differ only in the labeling of the states. Label switching can occur within a chain, when the sampler moves from one copy to another, or between chains, when each chain remains in a single copy but different chains settle on different ones. Our example corresponds to the second case, since the well-separated means make it unlikely for a chain to cross the region of low posterior density between copies. In either case, pooling the draws mixes different labelings, and, as noted by @jasra2005, averages of state-specific quantities become meaningless.
 
-## 4.2 What it looks like in practice: multiple chains, R-hat, traceplots
+To see why how the sampler moves from one copy to another, we calculate mean summaries of the parameters for each chain. It is observed that that the posterior means of $\mu_1$ and $\mu_2$ alternate between values close to $-2$ and $2$, the values of the rows of $\boldsymbol{\Gamma}$ alternate between $\begin{bmatrix} 0.80 \ 0.20 \end{bmatrix}$ and $\begin{bmatrix} 0.30 \ 0.70 \end{bmatrix}$ and the values of the stationary distribution alternate between $\begin{bmatrix} 0.60 \ 0.40 \end{bmatrix}$ and $\begin{bmatrix} 0.40 \ 0.60 \end{bmatrix}$. Meanwhile, the mean of `lp__` is nearly the same across chains, which confirms that the chains are exploring equivalent copies of the same mode rather than different modes.
+ 
+```{python}
+# Extract the posterior draws of weach chain
+draws = fit.draws_pd()
 
-## 4.3 Remedies: ordering constraints, post-hoc relabeling, invariant quantities
+# We only need these columss
+cols = ["lp__", "mu[1]", "mu[2]", "Gamma[1,1]", "Gamma[1,2]","Gamma[2,1]", "Gamma[2,2]", "delta[1]","delta[2]"]
 
-# 5 Genuine multimodality {#sec-genuine-multimodality}
-## 5.1Definition: modes that are not permutations of each other
+# Calculate posterior
+by_chain = draws.groupby("chain__")[cols].mean().round(2)
+by_chain
+```
+# 3 Label switching {#sec-label-switching}
 
-## 5.2 Detecting it after relabeling
+In @sec-exchangeability we showed that, under an exchangeable prior, the posterior distribution is invariant to permutations of the state labels (@eq-posterior-symmetry). As a consequence, the posterior has $m!$ identical copies, one for each labelling of the states. Label switching occurs when the MCMC draws come from more than one of these copies, so that a given label $j$ does not refer to the same state across draws. Switches can happen within a single chain or between chains.
 
-## 5.3 Why it matters for inference
+Label switching does not mean that the sampler has failed. A sampler that explores the full posterior should visit all copies [@jasra2005]. The problem lies in the interpretation of the output. Any summary that depends on the labels, such as the posterior mean of $\mu_1$ or the decoded state probabilities, averages over different states and does not describe any of them. Quantities that are invariant to the labels, such as the log posterior density, remain valid. To make inference about state-specific parameters, we therefore need a way to assign the labels consistently across draws.
 
-## 5.4 Why multiple chains are not enough
+In this section we give an introduction to three methods for addresing label switching, properly, *ordering constraints*, *post-hoc relabeling* and *invariant quantities*. Each method has its own advantages and disadvantages so they are discussed as well as . 
 
-# 6 Final remarks
+## 3.1 Ordering constraints
+
+@jasra2005 and @leosbarajas2018 suggest imposing constraints on the parameters can improve inference on the parameters. A natural choice is to order one parameter of the state-dependent distributions, for example the means, $\mu_1 < \mu_2 < \cdots < \mu_m$. Under this constraint, only one of the $m!$ copies of the posterior remains.
+
+This approach works well when the marginal posteriors of the ordered parameters, within a single copy, do not overlap. When they do overlap, the constraint truncates the posterior and biases the estimates, because the boundary $\mu_j = \mu_{j+1}$ cuts through regions of high posterior density.
+
+Using the example exposed in @sec-stan-implementation, we can impose restrictions on the means $\mu_1$ and $\mu_2$. This is achived in *Stan* by replacing the definition of `mu` in the block `parameters`.
+
+```{.stan}
+// parameters
+parameters{
+    ordered[m] mu; // means of state dependent distributions (now is a ordered array)
+    
+    // Rest of the code    
+}
+```
+
+We have a *Stan* program with the ordering constraint stored in `stan/02_ex1_normal_order.stan`. We compile it and fit it to the same data with the same settings as before. Unlike the unconstrained fit, all $\hat{R}$ values are now close to one, so we have convergence. The posterior means of $\mu_1$ and $\mu_2$ are $-2.10$ and $1.92$, close to the true values of $-2$ and $2$.
+
+The constraint works well in this example because the marginal posteriors of $\mu_1$ and $\mu_2$ do not overlap. The 95th percentile of $\mu_1$ is $-1.99$, well below the 5th percentile of $\mu_2$, which is $1.77$. The boundary $\mu_1 = \mu_2$ therefore lies in a region with no posterior mass.
+
+```{python}
+# Compile the Stan program
+model_ord = CmdStanModel(stan_file="../stan/02_ex1_normal_order.stan")
+
+# Fit the model 
+fit_ord = model.sample(data=stan_data, chains=8, parallel_chains=8, seed=123)
+
+# Fit Summary
+fit_ord.summary()
+```
+
+## 3.2 Post-hoc relabeling
+
+## 3.3 Invariant quantities
+
+
+<!--
+{# 4 Genuine multimodality {#sec-genuine-multimodality}}
+
+{## 4.1Definition: modes that are not permutations of each other
+}
+{## 4.2 Detecting it after relabeling
+}
+{## 4.3 Why it matters for inference
+}
+{## 4.4 Why multiple chains are not enough}
+# 5 Final remarks
+
+In this notebook we gave an introduction to Bayesian HMM and their components (priors and likelihood) and also we introduced the concept of exchangeability and invariability of the 
+
+-->
+
 
 # References
