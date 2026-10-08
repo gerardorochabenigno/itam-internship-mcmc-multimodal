@@ -634,7 +634,24 @@ fit_ord = model.sample(data=stan_data, chains=8, parallel_chains=8, seed=123)
 fit_ord.summary()
 ```
 
-## 3.2 Post-hoc relabeling
+## 3.2 Post-hoc relabelling
+
+Relabelling algorithms are a class of methods for dealing with label switching that rely on Bayesian decision theory [@stephens2000; @jasra2005]. Summarizing the posterior, for example by reporting a point estimate of the state-specific parameters, can be seen as choosing an action $a$ from a set of possible actions $\mathcal{A}$.  This summary, called an action $a$ can be a point estimate of the stet-specific parameters (such as $\mu_j$ or $\boldsymbol{\Gamma}$) or the probabilities $P(C_t = j| \mathbf{y})$ of each state at time $t$. Each cpice of action comes weith a loss function $\mathcal{L}:\mathcal{A} \times\boldsymbol{\theta}\rightarrow\mathbb{R}$ that measures how far $a$ is from the parameters, and the best acttion is the one that minimizes the posterior expected loss [@stephens2000].  
+
+For this, suppose that there is a function $\mathcal{L}:\mathcal{A} \times\boldsymbol{\theta}\rightarrow[0, \infty]$n such that 
+
+$$
+L(a,\boldsymbol{\theta})=\underset{\nu \in S_{m}}{\text{min}}{\{L_{0}(a, \nu(\boldsymbol{\theta}))\}}
+$$
+
+That is, $L(a,\boldsymbol{\theta})$ measures the loss with respect to the relabelling of $\boldsymbol{\theta}$ that is closest to $a$. As a result, $L$ is invariant to permutations of the labels, since $L(a, \boldsymbol{\theta}) = L(a, \nu(\boldsymbol{\theta}))$ for every $\nu \in S_m$.
+
+In practice, we have samples of the parameters $\boldsymbol{\theta}^{(1)}, \boldsymbol{\theta}^{(2)}, \dots, \boldsymbol{\theta}^{(N)}$ from a particular chain, that we assume is stationary. One way to compute the expected posterior loss is by *Monte Carlo*
+
+$$
+\mathbb{E}(L(a,\boldsymbol{\theta})) = \frac{1}{N} \sum_{t=1}^{N} \min_{\nu_t} \left[ L_0\{a;\, \nu_t(\boldsymbol\theta^{(t)})\} \right]
+= \min_{\nu_1, \dots, \nu_N} \left[ \frac{1}{N} \sum_{t=1}^{N} L_0\{a;\, \nu_t(\boldsymbol\theta^{(t)})\} \right]
+$$ {#eq-relabel-risk}
 
 ## 3.3 Invariant quantities
 
@@ -649,11 +666,24 @@ fit_ord.summary()
 {## 4.3 Why it matters for inference
 }
 {## 4.4 Why multiple chains are not enough}
-# 5 Final remarks
-
-In this notebook we gave an introduction to Bayesian HMM and their components (priors and likelihood) and also we introduced the concept of exchangeability and invariability of the 
-
 -->
 
+# 4 Final remarks
+
+In this notebook we introduced the Bayesian approach to HMMs. We showed that, under exchangeable priors, the posterior is symmetric with respect to the labels of the states, and that this symmetry gives rise to label switching that in practice causes each chain to settle in one of the $m!$ copies or alternate within. 
+
+In our example, label switching produced high values of the $\hat{R}$ convergence diagnostic of the parameters, while the $\hat{R}$ of the log-posterior showed that all chains reached regions of the same posterior density. An ordering constraint on the means removed the symmetry and, since the states were well separated, recovered the true parameters.
+
+The behaviour of the chains is the main lesson for what follows. Hamiltonian Monte Carlo explores the region around its starting point efficiently, but it rarely crosses regions of low posterior density between modes. With label switching this is harmless, since all copies are equivalent and any of them describes the same model. 
+
+When the posterior has genuinely different modes, that is, modes that are not permutations of each other, the same behaviour becomes a serious problem. Each chain may describe a different explanation of the data, and running several chains can reveal this disagreement but cannot tell us how much posterior mass each mode carries. Ordering constraints and relabelling do not help either, because they only remove the symmetry between labels.
+
+In the following notebooks we build a scenario with genuine multimodality, for example by fitting a model with more states than those used to simulate the data, and study how the general-purpose sampler fails on it. 
+
+We then introduce parallel tempering, which runs chains on a sequence of tempered distributions and swaps states between them to move across modes, and implement it with *Pigeons.jl* on the same *Stan* models. 
+
+<!---
+Since a sampler that moves between modes will also move between copies, the relabelling methods and invariant quantities discussed in @sec-label-switching will become necessary to summarize its output.
+--->
 
 # References
