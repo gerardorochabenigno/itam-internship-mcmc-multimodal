@@ -1,5 +1,5 @@
 ---
-title: "Bayesian Hidden Markov Models, label switching and genuine multimodality"
+title: "Bayesian Hidden Markov Models and the label switching problem"
 format: html
 engine: jupyter
 bibliography: references.bib
