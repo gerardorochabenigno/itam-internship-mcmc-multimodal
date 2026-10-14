@@ -2,10 +2,11 @@
 title: "Bayesian Hidden Markov Models and the label switching problem"
 format: html
 engine: jupyter
+number-sections: true
 bibliography: references.bib
 ---
 
-# 1. Introduction
+# Introduction
 
 Inte previous notebook we gave an introduction to Hidden Markov Models (HMMs), the maximum likelihood estimation vía the forward algorithm and the EM algorithm version for the estimation of HMM. We focused on the fudamentals and we use primary tools in the code snippetsinstead of specificly designed libraries for the estimation of HMM using the fquentist approach.
 
@@ -14,7 +15,7 @@ In this notebook, our focus is to expand the theory of HMM by introduciong the B
 Here we expand the theory by introducing a Bayesian approach to HMM, the label switching problem and genuine multimodality.
 
 
-# 2. Bayesian HMM
+# Bayesian HMM
 
 The Bayesian approach relies on Bayes' theorem, which states that the conditional distribution of a set of random variables $\boldsymbol{\theta}$ given a set of observations $\mathbf{y}$, called the posterior distribution, is equal to the product of the prior distribution of the parameters $p(\boldsymbol{\theta})$ and the conditional distribution of the observations given the parameters $p(\mathbf{y} \mid \boldsymbol{\theta})$, divided by the marginal distribution of $\mathbf{y}$, $p(\mathbf{y}) = \int p(\boldsymbol{\theta})\, p(\mathbf{y} \mid \boldsymbol{\theta})\, d\boldsymbol{\theta}$, which ensures that the posterior integrates to one [@gelman2013bda, ch. 1]:
 
@@ -30,7 +31,7 @@ $$ {#eq-posterior-unnorm}
 
 This last expression is the core of Bayesian inference. In most models of practical interest, the integral defining $p(\mathbf{y})$ has no closed form and cannot be computed numerically in high dimensions, so the posterior is only available up to a normalizing constant. Several methods have been developed to perform Bayesian inference under this limitation, among which Markov chain Monte Carlo (MCMC) methods stand out given that only require evaluating the unnormalized posterior in @eq-posterior-unnorm, since the normalizing constant cancels out when comparing the posterior density at two different values of $\boldsymbol{\theta}$ [@gelman2013bda, ch. 10].
 
-## 2.1 Parameters and prior distributions of a Bayesian HMM {#sec-priors}
+## Parameters and prior distributions of a Bayesian HMM {#sec-priors}
 
 Recall that an HMM is a state-space model consisting of an observation process $\{Y_t\}$ and an unobserved Markov process $\{C_t\}$ taking values in a finite set of states $\{1, \dots, m\}$ [@zucchini2016]. The realization of the observation process, $\mathbf{y} = (y_1, \dots, y_T)$, is the data on which the posterior in @eq-bayes is conditioned.
 
@@ -44,7 +45,7 @@ so that specifying a Bayesian HMM amounts to specifying a prior distribution $p(
 
 Regarding the initial distribution $\boldsymbol{\delta}$ if it is stationary, then it can be derived from $\boldsymbol{\Gamma}$ so it leaves $\boldsymbol{\theta}$. In this notebook we make the assumption that the Markov process is homogeneous and stationary.
 
-### 2.1.1 Transition probability matrix $\boldsymbol{\Gamma}$
+### Transition probability matrix $\boldsymbol{\Gamma}$
 
 Each row of the transition probability matrix, $\boldsymbol{\gamma}_i = (\gamma_{i1}, \dots, \gamma_{im})$ for $i = 1, \dots, m$, is a vector of non-negative entries that sum to one. In other words, it belongs to the probability *simplex*
 
@@ -78,7 +79,7 @@ $$ {#eq-dirichlet-uniform}
 
 Since this density does not depend on $\boldsymbol{\gamma}_i$, the $\text{Dir}(\mathbf{1}_m)$ prior is uniform on the simplex, with the constant $(m-1)!$ being the reciprocal of the volume of $\Delta^{m-1}$. Uniformity on the simplex, however, does not imply uniformity on each entry: the marginal prior of each $\gamma_{ij}$ is $\text{Beta}(1, m-1)$, which places more mass near zero as $m$ grows. In particular, it favors a priori low persistence in each state, i.e., small values of $\gamma_{ii}$.
 
-### 2.1.2 Initial distribution $\boldsymbol{\delta}$
+### Initial distribution $\boldsymbol{\delta}$
 
 Since the entries of the initial distribution $\boldsymbol{\delta}$ must add to one and are all non-negative, it also has support on the probability simplex $\Delta^{m-1}$. 
 
@@ -102,7 +103,7 @@ where $\mathbf{1}_m$ is a row vector of ones, $\mathbf{I}_m$ is the $m \times m$
 
 In this notebook we assume that the observation process starts when the chain is stationary and hence $\boldsymbol{\delta}$ is the stationary distribution. 
 
-### 2.1.3 State-dependent distributions
+### State-dependent distributions
 
 Unlike the transition probabilities, the parameters of the state-dependent distributions do not share a common support, so there is no single prior that applies to every model. However, the choice can be guided by the support of each parameter. For example, real-valued parameters such as means call for priors on $\mathbb{R}$, while positive parameters such as standard deviations or rates call for priors on $(0, \infty)$.
 
@@ -118,7 +119,7 @@ $$ {#eq-emission-priors}
 
 Two features of these priors are important for what follows. First, the same prior is assigned to the parameters of every state, as was done for the rows of $\boldsymbol{\Gamma}$, so that no state is distinguished a priori. The consequences of this choice are discussed in @sec-exchangeability. Second, the priors are weakly informative rather than vague. In mixture models and HMMs, improper or nearly flat priors on the state-dependent parameters can lead to improper posterior distributions, since there is always a configuration in which some state is assigned no observations and the data provide no information about its parameters [@fruhwirth2006].
 
-## 2.2 Likelihood via the forward algorithm
+## Likelihood via the forward algorithm
 
 The last element needed to assemble the unnormalized posterior distribution is the likelihood. In the previous notebook we showed that, by summing over all possible sequences of hidden states, the likelihood of an HMM can be written as the matrix product
 
@@ -136,7 +137,7 @@ $$ {#eq-log-posterior}
 
 No term for $\boldsymbol{\delta}$ appears, since under stationarity it carries no prior of its own. Each term of @eq-log-posterior corresponds to one statement in the Stan program presented below.
 
-## 2.3 Exchangeable priors and posterior symmetry {#sec-exchangeability}
+## Exchangeable priors and posterior symmetry {#sec-exchangeability}
 
 In this section we show that relabeling the hidden states leaves the posterior unchanged. This follows from the likelihood being invariant to the labels and from the priors being exchangeable, that is, treating all states in the same way [@jasra2005]. The resulting symmetry is what distinguishes the modes due to relabeling from genuinely different ones.
 
@@ -198,7 +199,7 @@ A posterior satisfying @eq-posterior-symmetry is said to be symmetric with respe
 
 Although relabeling leaves the posterior unchanged, it becomes problematic in practice when the posterior is explored with MCMC methods. By @eq-posterior-symmetry, the marginal posterior distributions of the state-dependent parameters coincide across states, so that, for instance, $\mu_1$ and $\mu_2$ have the same marginal posterior. A sampler that has converged to this symmetric posterior therefore moves between the $m!$ symmetric regions of high posterior density, and averages of state-specific quantities, such as the posterior mean of $\mu_1$, become meaningless [@jasra2005; @papastamoulis2016]. This phenomenon is known as *label switching* and methods for alleviating this phenomenon are discussed in @sec-label-switching.
 
-## 2.4 Implementation in Stan {#sec-stan-implementation}
+## Implementation in Stan {#sec-stan-implementation}
 
 To draw samples from the posterior distribution of the HMM we use *Stan*, a popular open-source probabilistic programming language designed for specifying statistical models and performing Bayesian inference [@carpenter2017]. Models are written in *Stan*'s own language and can be run from several environments through interfaces such as *CmdStanPy* for *Python*, *CmdStanR* for *R* and *Stan.jl* for *Julia*. In this notebook we use *CmdStanPy*. Details on installation and usage are available on the official [website](https://mc-stan.org) and in the introductory tutorial by @carpenter2023.
 
@@ -594,7 +595,8 @@ cols = ["lp__", "mu[1]", "mu[2]", "Gamma[1,1]", "Gamma[1,2]","Gamma[2,1]", "Gamm
 by_chain = draws.groupby("chain__")[cols].mean().round(2)
 by_chain
 ```
-# 3 Label switching {#sec-label-switching}
+
+# Label switching {#sec-label-switching}
 
 In @sec-exchangeability we showed that, under an exchangeable prior, the posterior distribution is invariant to permutations of the state labels (@eq-posterior-symmetry). As a consequence, the posterior has $m!$ identical copies, one for each labelling of the states. Label switching occurs when the MCMC draws come from more than one of these copies, so that a given label $j$ does not refer to the same state across draws. Switches can happen within a single chain or between chains.
 
@@ -602,7 +604,7 @@ Label switching does not mean that the sampler has failed. A sampler that explor
 
 In this section we give an introduction to three methods for addresing label switching, properly, *ordering constraints*, *post-hoc relabeling* and *invariant quantities*. Each method has its own advantages and disadvantages so they are discussed as well as . 
 
-## 3.1 Ordering constraints
+## Ordering constraints
 
 @jasra2005 and @leosbarajas2018 suggest imposing constraints on the parameters can improve inference on the parameters. A natural choice is to order one parameter of the state-dependent distributions, for example the means, $\mu_1 < \mu_2 < \cdots < \mu_m$. Under this constraint, only one of the $m!$ copies of the posterior remains.
 
@@ -628,13 +630,13 @@ The constraint works well in this example because the marginal posteriors of $\m
 model_ord = CmdStanModel(stan_file="../stan/02_ex1_normal_order.stan")
 
 # Fit the model 
-fit_ord = model.sample(data=stan_data, chains=8, parallel_chains=8, seed=123)
+fit_ord = model_ord.sample(data=stan_data, chains=8, parallel_chains=8, seed=123)
 
 # Fit Summary
 fit_ord.summary()
 ```
 
-## 3.2 Post-hoc relabelling
+## Post-hoc relabelling
 
 Relabelling algorithms are a class of methods for dealing with label switching that rely on Bayesian decision theory [@stephens2000; @jasra2005]. Summarizing the posterior, for example by reporting a point estimate of the state-specific parameters, can be seen as choosing an action $a$ from a set of possible actions $\mathcal{A}$.  This summary, called an action $a$ can be a point estimate of the stet-specific parameters (such as $\mu_j$ or $\boldsymbol{\Gamma}$) or the probabilities $P(C_t = j| \mathbf{y})$ of each state at time $t$. Each cpice of action comes weith a loss function $\mathcal{L}:\mathcal{A} \times\boldsymbol{\theta}\rightarrow\mathbb{R}$ that measures how far $a$ is from the parameters, and the best acttion is the one that minimizes the posterior expected loss [@stephens2000].  
 
@@ -653,7 +655,7 @@ $$
 = \min_{\nu_1, \dots, \nu_N} \left[ \frac{1}{N} \sum_{t=1}^{N} L_0\{a;\, \nu_t(\boldsymbol\theta^{(t)})\} \right]
 $$ {#eq-relabel-risk}
 
-## 3.3 Invariant quantities
+## Invariant quantities
 
 
 <!--
@@ -668,7 +670,7 @@ $$ {#eq-relabel-risk}
 {## 4.4 Why multiple chains are not enough}
 -->
 
-# 4 Final remarks
+# Final remarks
 
 In this notebook we introduced the Bayesian approach to HMMs. We showed that, under exchangeable priors, the posterior is symmetric with respect to the labels of the states, and that this symmetry gives rise to label switching that in practice causes each chain to settle in one of the $m!$ copies or alternate within. 
 

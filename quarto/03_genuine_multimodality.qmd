@@ -1,0 +1,27 @@
+---
+title: "Genuine multimodality in Hidden Markov Models and Parallel Tempering"
+format: html
+engine: jupyter
+number-sections: true
+bibliography: references.bib
+---
+
+# 1. Introduction
+
+In the previous notebook we explored the Bayesian approach to hidden Markov models, highlighting that the likelihood is invariant under permutations of the state labels and that, under exchangeable priors, this invariance is transfered to the posterior density. As a consequence, each mode of the posterior of an $m$-state HMM appears in $m!$ symmetric copies, one for each permutation of the labels. This makes state-specific posterior summaries, such as the posterior mean of each state's parameters, meaningless unless the labels are fixed in some way. We discussed several methods to deal with this label switching problem, namely ordering constraints, post-hoc relabeling and label-invariant quantities.
+
+In this notebook we explore a scenario in which, even after accounting for label switching, the posterior density has several modes that are not relabelings of one another, a situation known as **genuine multimodality** [@grun2009]. Since the methods discussed in the previous notebook assume that every mode is a permuted copy of a single one, they cannot resolve this problem. Genuine multimodality also exposes the limitations of general-purpose MCMC methods, such as the Hamiltonian Monte Carlo sampler used by *Stan*, whose chains tend to remain in the mode where they started. An incomplete exploration of the posterior yields summaries that describe only part of it, missing some modes and misrepresenting the relative weight of the others, so the consequences of this problem are not only computational but also inferential [@gallegosherrada2026].
+
+Parallel tempering, the class of MCMC methods on which this series focuses, is designed for posterior densities with several modes separated by regions of low probability. Before introducing it, we need to understand when genuine multimodality arises in HMMs and why general-purpose samplers fail to handle it. In later notebooks we apply these ideas to HMMs and to a more general class of models, the *Markov switching models*.
+
+The rest of this notebook is organized as follows. In @sec-genuine-defs we define genuine multimodality and describe situations in which it may arise in practice. In @sec-failures-mcmc we use simulated data to show how *Stan* fails to explore the full posterior density in the presence of genuine multimodality. Finally, in @sec-first-look-pt we introduce parallel tempering, a class of MCMC algorithms that runs several chains on tempered versions of the posterior and exchanges states between them, which allows the sampler to move between modes separated by regions of low probability.
+
+# Genuine multimodality in hidden Markov models {#sec-genuine-defs}
+
+# Examples of failures of general-purpose MCMC methods {#sec-failures-mcmc}
+
+# A first look at parallel tempering {#sec-first-look-pt}
+
+# Final remarks
+
+# References
