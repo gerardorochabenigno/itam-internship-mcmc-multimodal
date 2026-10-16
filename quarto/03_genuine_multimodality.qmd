@@ -18,6 +18,44 @@ The rest of this notebook is organized as follows. In @sec-genuine-defs we defin
 
 # Genuine multimodality in hidden Markov models {#sec-genuine-defs}
 
+As in the previous notebooks, consider an $m$-state HMM with observation process $\{Y_t\}$ and state process $\{C_t\}$. The state process is a homogeneous Markov chain with transition probability matrix $\boldsymbol{\Gamma}$, and we assume that its initial distribution $\boldsymbol{\delta}$ is the stationary distribution. Hence $\boldsymbol{\delta}$ is determined by $\boldsymbol{\Gamma}$ and is not a free parameter of the model. Conditionally on $C_t = j$, the observation $Y_t$ follows a state-dependent distribution $f_j(\cdot\,; \boldsymbol{\eta}_j)$ with its own parameters $\boldsymbol{\eta}_j$, for $j = 1, \dots, m$. We collect all free parameters in the vector
+
+$$
+\boldsymbol{\theta} = (\boldsymbol{\Gamma}, \boldsymbol{\eta}_1, \dots, \boldsymbol{\eta}_m).
+$$
+
+To define genuine multimodality we first need to describe how a permutation of the state labels acts on $\boldsymbol{\theta}$. Let $S_m$ denote the set of the $m!$ permutations of $\{1, \dots, m\}$. For a permutation $\nu \in S_m$, the relabeled parameter vector $\nu(\boldsymbol{\theta})$ has components
+
+$$
+\gamma'_{ij} = \gamma_{\nu(i)\nu(j)}, \qquad \boldsymbol{\eta}'_j = \boldsymbol{\eta}_{\nu(j)}, \qquad i, j = 1, \dots, m.
+$$ {#eq-permutation}
+
+Since $\boldsymbol{\delta}$ is the stationary distribution of $\boldsymbol{\Gamma}$, it is relabeled in the same way, $\delta'_i = \delta_{\nu(i)}$.
+
+Relabeling the states does not change the distribution of the observations, so the likelihood is invariant under any permutation of the labels,
+
+$$
+L(\nu(\boldsymbol{\theta})) = L(\boldsymbol{\theta}) \quad \text{for all } \nu \in S_m.
+$$
+
+If, in addition, the prior is exchangeable, that is, $p(\nu(\boldsymbol{\theta})) = p(\boldsymbol{\theta})$ for all $\nu \in S_m$, the posterior density inherits the same invariance,
+
+$$
+p(\nu(\boldsymbol{\theta}) \mid \mathbf{y}) = p(\boldsymbol{\theta} \mid \mathbf{y}) \quad \text{for all } \nu \in S_m.
+$$
+
+This invariance can be described through equivalence classes on the parameter space $\Theta$. Following @gallegosherrada2006 and @grun2009, we say that two parameter vectors $\boldsymbol{\theta}_1, \boldsymbol{\theta}_2 \in \Theta$ are equivalent if one is a relabeling of the other,
+
+$$
+\boldsymbol{\theta}_1 \sim \boldsymbol{\theta}_2 \iff \exists\, \nu \in S_m \text{ such that } \boldsymbol{\theta}_1 = \nu(\boldsymbol{\theta}_2).
+$$
+
+This relation partitions $\Theta$ into disjoint equivalence classes, each containing all relabelings of a given parameter vector, and both the likelihood and the posterior are constant within each class. Each class therefore represents a single model, and its elements differ only in the names given to the states.
+
+Under invariance of the posterior density, it has $m!$ symmetric modes where a mode is a local maximum of the posterior [@gallegosherrada2026]. 
+
+Now, assume that the symmetric modes are no longer present in the model, wich can be achieved by imposing restrictions on the parameters or by relabeling post-hoc the states, causing the posterior density to be represented by a single permutation of the labels. If after this correction there posterior density exhibits several local maxima, then the posterior is said to be *genuinely multimodal*. Formally, we say that the posterior is genuinely multimodal if there are two point
+
 # Examples of failures of general-purpose MCMC methods {#sec-failures-mcmc}
 
 # A first look at parallel tempering {#sec-first-look-pt}
