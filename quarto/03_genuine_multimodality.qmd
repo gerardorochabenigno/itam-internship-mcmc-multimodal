@@ -24,15 +24,51 @@ $$
 \boldsymbol{\theta} = (\boldsymbol{\Gamma}, \boldsymbol{\eta}_1, \dots, \boldsymbol{\eta}_m).
 $$
 
-To define genuine multimodality we first need to describe how a permutation of the state labels acts on $\boldsymbol{\theta}$. Let $S_m$ denote the set of the $m!$ permutations of $\{1, \dots, m\}$. For a permutation $\nu \in S_m$, the relabeled parameter vector $\nu(\boldsymbol{\theta})$ has components
+The parameter space $\Theta$ is the set of all admissible values of $\boldsymbol{\theta}$, that is, the values that satisfy the constraints of the model. In this model, each row of $\boldsymbol{\Gamma}$ must have nonnegative entries that sum to one, $\boldsymbol{\Gamma}$ must be irreducible so that its stationary distribution is unique, and each $\boldsymbol{\eta}_j$ must lie in the parameter space of $f_j$, for example a positive standard deviation in the normal case. Each point of $\Theta$ is therefore a complete specification of the model.
+
+In order to define genuine multimodality, we need to recall the label switching problem that arises in Bayesian HMMs induced from the invariance of the likelihood due to relabeling of the states and the use of symmetric priors.
+
+## Relabeling the states
+
+Let $S_m$ denote the set of the $m!$ permutations of the labels $\{1, \dots, m\}$. Each permutation $\nu \in S_m$ is a one-to-one function that assigns a new label $\nu(j)$ to each label $j$. With a slight abuse of notation, we write $\nu(\boldsymbol{\theta})$ for the parameter vector obtained by relabeling the states according to $\nu$. Its components are
 
 $$
 \gamma'_{ij} = \gamma_{\nu(i)\nu(j)}, \qquad \boldsymbol{\eta}'_j = \boldsymbol{\eta}_{\nu(j)}, \qquad i, j = 1, \dots, m.
 $$ {#eq-permutation}
 
-Since $\boldsymbol{\delta}$ is the stationary distribution of $\boldsymbol{\Gamma}$, it is relabeled in the same way, $\delta'_i = \delta_{\nu(i)}$.
+The same permutation is applied simultaneously to the state-dependent parameters and to both the rows and the columns of $\boldsymbol{\Gamma}$. Permuting only some components, for instance swapping $\boldsymbol{\eta}_1$ and $\boldsymbol{\eta}_2$ while keeping $\boldsymbol{\Gamma}$ unchanged, produces in general a different model. Since $\boldsymbol{\delta}$ is the stationary distribution of $\boldsymbol{\Gamma}$, it is relabeled in the same way, $\delta'_i = \delta_{\nu(i)}$.
 
-Relabeling the states does not change the distribution of the observations, so the likelihood is invariant under any permutation of the labels,
+::: {.callout-note}
+## Example
+
+Consider a 3-state HMM with normal emissions, state means $(\mu_1, \mu_2, \mu_3) = (-2, 0, 3)$ and transition probability matrix
+
+$$
+\boldsymbol{\Gamma} =
+\begin{pmatrix}
+0.80 & 0.10 & 0.10 \\
+0.20 & 0.70 & 0.10 \\
+0.05 & 0.15 & 0.80
+\end{pmatrix}.
+$$
+
+Take the permutation that swaps states 1 and 3, so $\nu(1) = 3$, $\nu(2) = 2$ and $\nu(3) = 1$. Applying @eq-permutation gives $(\mu'_1, \mu'_2, \mu'_3) = (3, 0, -2)$ and
+
+$$
+\boldsymbol{\Gamma}' =
+\begin{pmatrix}
+0.80 & 0.15 & 0.05 \\
+0.10 & 0.70 & 0.20 \\
+0.10 & 0.10 & 0.80
+\end{pmatrix}.
+$$
+
+Both parameter vectors describe exactly the same model. The state with mean $3$ is now called state 1, and its row and column in $\boldsymbol{\Gamma}'$ moved accordingly.
+:::
+
+## Invariance and equivalence classes
+
+As we seen in the previous notebook, relabeling the states does not change the distribution of the observations, so the likelihood is invariant under any permutation of the labels,
 
 $$
 L(\nu(\boldsymbol{\theta})) = L(\boldsymbol{\theta}) \quad \text{for all } \nu \in S_m.
@@ -44,17 +80,59 @@ $$
 p(\nu(\boldsymbol{\theta}) \mid \mathbf{y}) = p(\boldsymbol{\theta} \mid \mathbf{y}) \quad \text{for all } \nu \in S_m.
 $$
 
-This invariance can be described through equivalence classes on the parameter space $\Theta$. Following @gallegosherrada2006 and @grun2009, we say that two parameter vectors $\boldsymbol{\theta}_1, \boldsymbol{\theta}_2 \in \Theta$ are equivalent if one is a relabeling of the other,
+This invariance can be described through equivalence classes on $\Theta$. Following @gallegosherrada2026 and @grun2009, we say that two parameter vectors $\boldsymbol{\theta}_1, \boldsymbol{\theta}_2 \in \Theta$ are equivalent if one is a relabeling of the other,
 
 $$
 \boldsymbol{\theta}_1 \sim \boldsymbol{\theta}_2 \iff \exists\, \nu \in S_m \text{ such that } \boldsymbol{\theta}_1 = \nu(\boldsymbol{\theta}_2).
 $$
 
-This relation partitions $\Theta$ into disjoint equivalence classes, each containing all relabelings of a given parameter vector, and both the likelihood and the posterior are constant within each class. Each class therefore represents a single model, and its elements differ only in the names given to the states.
+In the example above, the two parameter vectors are equivalent. This relation is an equivalence relation, since every vector is a relabeling of itself (identity permutation), relabelings can be undone (inverse permutation), and two successive relabelings are again a relabeling (composition of permutations). As any equivalence relation, it partitions $\Theta$ into disjoint equivalence classes, each containing all relabelings of a given parameter vector. Both the likelihood and the posterior are constant within each class, so each class represents a single model and its elements differ only in the names given to the states.
 
-Under invariance of the posterior density, it has $m!$ symmetric modes where a mode is a local maximum of the posterior [@gallegosherrada2026]. 
+A class contains at most $m!$ elements. It contains exactly $m!$ elements when all the $\boldsymbol{\eta}_j$ are different, because then every permutation other than the identity moves at least one $\boldsymbol{\eta}_j$ and produces a different point of $\Theta$. If two states had exactly the same parameters, swapping them would leave $\boldsymbol{\theta}$ unchanged and the class would be smaller.
 
-Now, assume that the symmetric modes are no longer present in the model, wich can be achieved by imposing restrictions on the parameters or by relabeling post-hoc the states, causing the posterior density to be represented by a single permutation of the labels. If after this correction there posterior density exhibits several local maxima, then the posterior is said to be *genuinely multimodal*. Formally, we say that the posterior is genuinely multimodal if there are two point
+## Modes of the posterior
+
+A point $\boldsymbol{\theta}^* \in \Theta$ is a mode of the posterior if it is a local maximum, that is, if there is a neighborhood $U$ of $\boldsymbol{\theta}^*$ such that $p(\boldsymbol{\theta}^* \mid \mathbf{y}) \geq p(\boldsymbol{\theta} \mid \mathbf{y})$ for all $\boldsymbol{\theta} \in U$. We denote by $\mathcal{M}$ the set of all modes of the posterior. The maximum a posteriori (MAP) estimate is the highest of them, but $\mathcal{M}$ also contains every local maximum. Following @grun2009, if the posterior is constant on a peak, the whole peak counts as a single mode.
+
+Because the posterior is invariant, if $\boldsymbol{\theta}^*$ is a mode then every relabeling $\nu(\boldsymbol{\theta}^*)$ is also a mode with the same posterior density. Hence $\mathcal{M}$ is made of complete equivalence classes. When all the $\boldsymbol{\eta}_j$ are different and the modes are isolated points, each class in $\mathcal{M}$ contributes exactly $m!$ symmetric modes. In particular, the MAP is not unique, since $m!$ different points of $\Theta$ share the maximum value of the posterior.
+
+::: {.callout-note}
+## Example
+
+In the 3-state example, if the posterior has a mode with means $(-2, 0, 3)$, it also has modes with means $(-2, 3, 0)$, $(0, -2, 3)$, $(0, 3, -2)$, $(3, -2, 0)$ and $(3, 0, -2)$, each with its transition probability matrix relabeled accordingly. These six modes are different points of $\Theta$ with the same posterior density, and they all belong to the same equivalence class.
+:::
+
+These statements assume that the posterior has at least one mode, which requires it to be bounded. With normal emissions, a prior on the standard deviations is needed for this, since otherwise the likelihood can grow without bound when a standard deviation shrinks to zero.
+
+## Genuine multimodality
+
+The symmetric modes described above are the label switching problem of the previous notebook. They all belong to the same class and therefore describe the same model. Genuine multimodality refers to modes that belong to different classes.
+
+::: {#def-genuine}
+## Genuine multimodality
+
+The posterior density is genuinely multimodal if there exist two modes $\boldsymbol{\theta}_1, \boldsymbol{\theta}_2 \in \mathcal{M}$ such that
+
+$$
+\boldsymbol{\theta}_1 \neq \nu(\boldsymbol{\theta}_2) \quad \text{for all } \nu \in S_m,
+$$
+
+that is, if $\mathcal{M}$ contains modes from at least two different equivalence classes.
+:::
+
+An equivalent way to state this definition uses a restricted parameter space $\tilde{\Theta} \subset \Theta$ that contains exactly one representative of each equivalence class, for instance the vectors that satisfy an ordering constraint on the state means. The posterior is not genuinely multimodal if, restricted to $\tilde{\Theta}$, it has a single mode, and it is genuinely multimodal if it has several.
+
+This formulation shows why the methods of the previous notebook are not enough. An ordering constraint keeps one copy of each class, so if $\mathcal{M}$ contains several classes, several modes remain after imposing it. Post-hoc relabeling algorithms face a similar problem, since they assume that all the modes are relabelings of a single one. Moreover, genuine modes can have different heights and lead to different interpretations of the states, so posterior summaries computed over draws from several genuine modes mix different models.
+
+## When does genuine multimodality arise in HMMs?
+
+@grun2009 show that genuine multimodality occurs in finite mixture models when different parameterizations induce similar mixture distributions. An HMM whose transition probability matrix has identical rows is a finite mixture, so these results apply to HMMs as a special case. In general, however, the dependence between observations carries additional information about the states, and it is not obvious whether the same phenomenon persists.
+
+Genuine multimodality in HMMs can arise from two broad sources. The first is uncertainty in the specification of the model. Fitting a number of states different from the one that generated the data is a typical example. With too few states, the model can merge the true states in several different ways, and with too many, it can split them in several different ways. In both cases each arrangement may correspond to a different mode of the posterior. A related situation occurs when some state-dependent distributions are nearly indistinguishable. Even if the number of states is correct, the data provide little information to decide which state explains which observations, and the likelihood may compensate through different values of $\boldsymbol{\Gamma}$.
+
+The second source is a limited amount of data, which can produce genuine multimodality even when the model is correctly specified. With few observations, the likelihood is not informative enough to concentrate the posterior around a single equivalence class. In HMMs, the relevant amount of information depends not only on the length of the series but also on how many transitions between states it contains, since a series with very persistent states provides few switches from which to learn $\boldsymbol{\Gamma}$. Under correct specification, we expect these additional modes to vanish as the number of observations grows, while those caused by misspecification may persist.
+
+In this notebook we illustrate both sources with simulated data. In the first example the model is misspecified, since we fit an HMM with fewer states than the one that generated the data. In the second example the model is correctly specified, but the series is short, so the data contain little information about the parameters. For this second example we also fit the same model to a longer series, which serves as a reference in which we expect the additional modes to disappear. In @sec-failures-mcmc we verify empirically whether each setting produces genuine multimodality and how *Stan* behaves in its presence.
 
 # Examples of failures of general-purpose MCMC methods {#sec-failures-mcmc}
 
