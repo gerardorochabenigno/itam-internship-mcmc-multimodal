@@ -9,6 +9,7 @@ website:
       - index.qmd
       - 01_hmm_intro.qmd
       - 02_bayesian_hmm_label_switching_multimodality.qmd
+      - 03_genuine_multimodality.qmd
 
 bibliography: references.bib
 

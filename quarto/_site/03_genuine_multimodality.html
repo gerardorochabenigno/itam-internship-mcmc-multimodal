@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.27">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Genuine multimodality in Hidden Markov Models and Parallel Tempering – MCMC for multimodal posteriors</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-ed96de9b727972fe78a7b5d16c58bf87.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-ff63373b1067ca6f91cf1456aa1f00a2.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar floating fullcontent quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./03_genuine_multimodality.html">Genuine multimodality in Hidden Markov Models and Parallel Tempering</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">MCMC for multimodal posteriors</a> 
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Implementing Markov Chain Monte Carlo Algorithms for Multimodal Posterior Distributions</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./01_hmm_intro.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction to Hidden Markov Models</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./02_bayesian_hmm_label_switching_multimodality.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Bayesian Hidden Markov Models and the label switching problem</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./03_genuine_multimodality.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Genuine multimodality in Hidden Markov Models and Parallel Tempering</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Genuine multimodality in Hidden Markov Models and Parallel Tempering</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> 1. Introduction</h1>
+<p>In the previous notebook we explored the Bayesian approach to hidden Markov models, highlighting that the likelihood is invariant under permutations of the state labels and that, under exchangeable priors, this invariance is transfered to the posterior density. As a consequence, each mode of the posterior of an <span class="math inline">\(m\)</span>-state HMM appears in <span class="math inline">\(m!\)</span> symmetric copies, one for each permutation of the labels. This makes state-specific posterior summaries, such as the posterior mean of each state’s parameters, meaningless unless the labels are fixed in some way. We discussed several methods to deal with this label switching problem, namely ordering constraints, post-hoc relabeling and label-invariant quantities.</p>
+<p>In this notebook we explore a scenario in which, even after accounting for label switching, the posterior density has several modes that are not relabelings of one another, a situation known as <strong>genuine multimodality</strong> <span class="citation" data-cites="grun2009">(<a href="#ref-grun2009" role="doc-biblioref">Grün and Leisch 2009</a>)</span>. Since the methods discussed in the previous notebook assume that every mode is a permuted copy of a single one, they cannot resolve this problem. Genuine multimodality also exposes the limitations of general-purpose MCMC methods, such as the Hamiltonian Monte Carlo sampler used by <em>Stan</em>, whose chains tend to remain in the mode where they started. An incomplete exploration of the posterior yields summaries that describe only part of it, missing some modes and misrepresenting the relative weight of the others, so the consequences of this problem are not only computational but also inferential <span class="citation" data-cites="gallegosherrada2026">(<a href="#ref-gallegosherrada2026" role="doc-biblioref">Gallegos-Herrada, Leos-Barajas, and Rosenthal 2026</a>)</span>.</p>
+<p>Parallel tempering, the class of MCMC methods on which this series focuses, is designed for posterior densities with several modes separated by regions of low probability. Before introducing it, we need to understand when genuine multimodality arises in HMMs and why general-purpose samplers fail to handle it. In later notebooks we apply these ideas to HMMs and to a more general class of models, the <em>Markov switching models</em>.</p>
+<p>The rest of this notebook is organized as follows. In <a href="#sec-genuine-defs" class="quarto-xref">Section&nbsp;2</a> we define genuine multimodality and describe situations in which it may arise in practice. In <a href="#sec-failures-mcmc" class="quarto-xref">Section&nbsp;3</a> we use simulated data to show how <em>Stan</em> fails to explore the full posterior density in the presence of genuine multimodality. Finally, in <a href="#sec-first-look-pt" class="quarto-xref">Section&nbsp;4</a> we introduce parallel tempering, a class of MCMC algorithms that runs several chains on tempered versions of the posterior and exchanges states between them, which allows the sampler to move between modes separated by regions of low probability.</p>
+</section>
+<section id="sec-genuine-defs" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Genuine multimodality in hidden Markov models</h1>
+<p>As in the previous notebooks, consider an <span class="math inline">\(m\)</span>-state HMM with observation process <span class="math inline">\(\{Y_t\}\)</span> and state process <span class="math inline">\(\{C_t\}\)</span>. The state process is a homogeneous Markov chain with transition probability matrix <span class="math inline">\(\boldsymbol{\Gamma}\)</span>, and we assume that its initial distribution <span class="math inline">\(\boldsymbol{\delta}\)</span> is the stationary distribution. Hence <span class="math inline">\(\boldsymbol{\delta}\)</span> is determined by <span class="math inline">\(\boldsymbol{\Gamma}\)</span> and is not a free parameter of the model. Conditionally on <span class="math inline">\(C_t = j\)</span>, the observation <span class="math inline">\(Y_t\)</span> follows a state-dependent distribution <span class="math inline">\(f_j(\cdot\,; \boldsymbol{\eta}_j)\)</span> with its own parameters <span class="math inline">\(\boldsymbol{\eta}_j\)</span>, for <span class="math inline">\(j = 1, \dots, m\)</span>. We collect all free parameters in the vector</p>
+<p><span class="math display">\[
+\boldsymbol{\theta} = (\boldsymbol{\Gamma}, \boldsymbol{\eta}_1, \dots, \boldsymbol{\eta}_m).
+\]</span></p>
+<p>The parameter space <span class="math inline">\(\Theta\)</span> is the set of all admissible values of <span class="math inline">\(\boldsymbol{\theta}\)</span>, that is, the values that satisfy the constraints of the model. In this model, each row of <span class="math inline">\(\boldsymbol{\Gamma}\)</span> must have nonnegative entries that sum to one, <span class="math inline">\(\boldsymbol{\Gamma}\)</span> must be irreducible so that its stationary distribution is unique, and each <span class="math inline">\(\boldsymbol{\eta}_j\)</span> must lie in the parameter space of <span class="math inline">\(f_j\)</span>, for example a positive standard deviation in the normal case. Each point of <span class="math inline">\(\Theta\)</span> is therefore a complete specification of the model.</p>
+<p>In order to define genuine multimodality, we need to recall the label switching problem that arises in Bayesian HMMs induced from the invariance of the likelihood due to relabeling of the states and the use of symmetric priors.</p>
+<section id="relabeling-the-states" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="relabeling-the-states"><span class="header-section-number">2.1</span> Relabeling the states</h2>
+<p>Let <span class="math inline">\(S_m\)</span> denote the set of the <span class="math inline">\(m!\)</span> permutations of the labels <span class="math inline">\(\{1, \dots, m\}\)</span>. Each permutation <span class="math inline">\(\nu \in S_m\)</span> is a one-to-one function that assigns a new label <span class="math inline">\(\nu(j)\)</span> to each label <span class="math inline">\(j\)</span>. With a slight abuse of notation, we write <span class="math inline">\(\nu(\boldsymbol{\theta})\)</span> for the parameter vector obtained by relabeling the states according to <span class="math inline">\(\nu\)</span>. Its components are</p>
+<p><span id="eq-permutation"><span class="math display">\[
+\gamma'_{ij} = \gamma_{\nu(i)\nu(j)}, \qquad \boldsymbol{\eta}'_j = \boldsymbol{\eta}_{\nu(j)}, \qquad i, j = 1, \dots, m.
+\tag{1}\]</span></span></p>
+<p>The same permutation is applied simultaneously to the state-dependent parameters and to both the rows and the columns of <span class="math inline">\(\boldsymbol{\Gamma}\)</span>. Permuting only some components, for instance swapping <span class="math inline">\(\boldsymbol{\eta}_1\)</span> and <span class="math inline">\(\boldsymbol{\eta}_2\)</span> while keeping <span class="math inline">\(\boldsymbol{\Gamma}\)</span> unchanged, produces in general a different model. Since <span class="math inline">\(\boldsymbol{\delta}\)</span> is the stationary distribution of <span class="math inline">\(\boldsymbol{\Gamma}\)</span>, it is relabeled in the same way, <span class="math inline">\(\delta'_i = \delta_{\nu(i)}\)</span>.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Example
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Consider a 3-state HMM with normal emissions, state means <span class="math inline">\((\mu_1, \mu_2, \mu_3) = (-2, 0, 3)\)</span> and transition probability matrix</p>
+<p><span class="math display">\[
+\boldsymbol{\Gamma} =
+\begin{pmatrix}
+0.80 &amp; 0.10 &amp; 0.10 \\
+0.20 &amp; 0.70 &amp; 0.10 \\
+0.05 &amp; 0.15 &amp; 0.80
+\end{pmatrix}.
+\]</span></p>
+<p>Take the permutation that swaps states 1 and 3, so <span class="math inline">\(\nu(1) = 3\)</span>, <span class="math inline">\(\nu(2) = 2\)</span> and <span class="math inline">\(\nu(3) = 1\)</span>. Applying <a href="#eq-permutation" class="quarto-xref">Equation&nbsp;1</a> gives <span class="math inline">\((\mu'_1, \mu'_2, \mu'_3) = (3, 0, -2)\)</span> and</p>
+<p><span class="math display">\[
+\boldsymbol{\Gamma}' =
+\begin{pmatrix}
+0.80 &amp; 0.15 &amp; 0.05 \\
+0.10 &amp; 0.70 &amp; 0.20 \\
+0.10 &amp; 0.10 &amp; 0.80
+\end{pmatrix}.
+\]</span></p>
+<p>Both parameter vectors describe exactly the same model. The state with mean <span class="math inline">\(3\)</span> is now called state 1, and its row and column in <span class="math inline">\(\boldsymbol{\Gamma}'\)</span> moved accordingly.</p>
+</div>
+</div>
+</section>
+<section id="invariance-and-equivalence-classes" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="invariance-and-equivalence-classes"><span class="header-section-number">2.2</span> Invariance and equivalence classes</h2>
+<p>As we seen in the previous notebook, relabeling the states does not change the distribution of the observations, so the likelihood is invariant under any permutation of the labels,</p>
+<p><span class="math display">\[
+L(\nu(\boldsymbol{\theta})) = L(\boldsymbol{\theta}) \quad \text{for all } \nu \in S_m.
+\]</span></p>
+<p>If, in addition, the prior is exchangeable, that is, <span class="math inline">\(p(\nu(\boldsymbol{\theta})) = p(\boldsymbol{\theta})\)</span> for all <span class="math inline">\(\nu \in S_m\)</span>, the posterior density inherits the same invariance,</p>
+<p><span class="math display">\[
+p(\nu(\boldsymbol{\theta}) \mid \mathbf{y}) = p(\boldsymbol{\theta} \mid \mathbf{y}) \quad \text{for all } \nu \in S_m.
+\]</span></p>
+<p>This invariance can be described through equivalence classes on <span class="math inline">\(\Theta\)</span>. Following <span class="citation" data-cites="gallegosherrada2026">Gallegos-Herrada, Leos-Barajas, and Rosenthal (<a href="#ref-gallegosherrada2026" role="doc-biblioref">2026</a>)</span> and <span class="citation" data-cites="grun2009">Grün and Leisch (<a href="#ref-grun2009" role="doc-biblioref">2009</a>)</span>, we say that two parameter vectors <span class="math inline">\(\boldsymbol{\theta}_1, \boldsymbol{\theta}_2 \in \Theta\)</span> are equivalent if one is a relabeling of the other,</p>
+<p><span class="math display">\[
+\boldsymbol{\theta}_1 \sim \boldsymbol{\theta}_2 \iff \exists\, \nu \in S_m \text{ such that } \boldsymbol{\theta}_1 = \nu(\boldsymbol{\theta}_2).
+\]</span></p>
+<p>In the example above, the two parameter vectors are equivalent. This relation is an equivalence relation, since every vector is a relabeling of itself (identity permutation), relabelings can be undone (inverse permutation), and two successive relabelings are again a relabeling (composition of permutations). As any equivalence relation, it partitions <span class="math inline">\(\Theta\)</span> into disjoint equivalence classes, each containing all relabelings of a given parameter vector. Both the likelihood and the posterior are constant within each class, so each class represents a single model and its elements differ only in the names given to the states.</p>
+<p>A class contains at most <span class="math inline">\(m!\)</span> elements. It contains exactly <span class="math inline">\(m!\)</span> elements when all the <span class="math inline">\(\boldsymbol{\eta}_j\)</span> are different, because then every permutation other than the identity moves at least one <span class="math inline">\(\boldsymbol{\eta}_j\)</span> and produces a different point of <span class="math inline">\(\Theta\)</span>. If two states had exactly the same parameters, swapping them would leave <span class="math inline">\(\boldsymbol{\theta}\)</span> unchanged and the class would be smaller.</p>
+</section>
+<section id="modes-of-the-posterior" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="modes-of-the-posterior"><span class="header-section-number">2.3</span> Modes of the posterior</h2>
+<p>A point <span class="math inline">\(\boldsymbol{\theta}^* \in \Theta\)</span> is a mode of the posterior if it is a local maximum, that is, if there is a neighborhood <span class="math inline">\(U\)</span> of <span class="math inline">\(\boldsymbol{\theta}^*\)</span> such that <span class="math inline">\(p(\boldsymbol{\theta}^* \mid \mathbf{y}) \geq p(\boldsymbol{\theta} \mid \mathbf{y})\)</span> for all <span class="math inline">\(\boldsymbol{\theta} \in U\)</span>. We denote by <span class="math inline">\(\mathcal{M}\)</span> the set of all modes of the posterior. The maximum a posteriori (MAP) estimate is the highest of them, but <span class="math inline">\(\mathcal{M}\)</span> also contains every local maximum. Following <span class="citation" data-cites="grun2009">Grün and Leisch (<a href="#ref-grun2009" role="doc-biblioref">2009</a>)</span>, if the posterior is constant on a peak, the whole peak counts as a single mode.</p>
+<p>Because the posterior is invariant, if <span class="math inline">\(\boldsymbol{\theta}^*\)</span> is a mode then every relabeling <span class="math inline">\(\nu(\boldsymbol{\theta}^*)\)</span> is also a mode with the same posterior density. Hence <span class="math inline">\(\mathcal{M}\)</span> is made of complete equivalence classes. When all the <span class="math inline">\(\boldsymbol{\eta}_j\)</span> are different and the modes are isolated points, each class in <span class="math inline">\(\mathcal{M}\)</span> contributes exactly <span class="math inline">\(m!\)</span> symmetric modes. In particular, the MAP is not unique, since <span class="math inline">\(m!\)</span> different points of <span class="math inline">\(\Theta\)</span> share the maximum value of the posterior.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Example
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>In the 3-state example, if the posterior has a mode with means <span class="math inline">\((-2, 0, 3)\)</span>, it also has modes with means <span class="math inline">\((-2, 3, 0)\)</span>, <span class="math inline">\((0, -2, 3)\)</span>, <span class="math inline">\((0, 3, -2)\)</span>, <span class="math inline">\((3, -2, 0)\)</span> and <span class="math inline">\((3, 0, -2)\)</span>, each with its transition probability matrix relabeled accordingly. These six modes are different points of <span class="math inline">\(\Theta\)</span> with the same posterior density, and they all belong to the same equivalence class.</p>
+</div>
+</div>
+<p>These statements assume that the posterior has at least one mode, which requires it to be bounded. With normal emissions, a prior on the standard deviations is needed for this, since otherwise the likelihood can grow without bound when a standard deviation shrinks to zero.</p>
+</section>
+<section id="genuine-multimodality" class="level2" data-number="2.4">
+<h2 data-number="2.4" class="anchored" data-anchor-id="genuine-multimodality"><span class="header-section-number">2.4</span> Genuine multimodality</h2>
+<p>The symmetric modes described above are the label switching problem of the previous notebook. They all belong to the same class and therefore describe the same model. Genuine multimodality refers to modes that belong to different classes.</p>
+<div id="def-genuine" class="theorem definition">
+<p><span class="theorem-title"><strong>Definition 1 (Genuine multimodality)</strong></span> The posterior density is genuinely multimodal if there exist two modes <span class="math inline">\(\boldsymbol{\theta}_1, \boldsymbol{\theta}_2 \in \mathcal{M}\)</span> such that</p>
+<p><span class="math display">\[
+\boldsymbol{\theta}_1 \neq \nu(\boldsymbol{\theta}_2) \quad \text{for all } \nu \in S_m,
+\]</span></p>
+<p>that is, if <span class="math inline">\(\mathcal{M}\)</span> contains modes from at least two different equivalence classes.</p>
+</div>
+<p>An equivalent way to state this definition uses a restricted parameter space <span class="math inline">\(\tilde{\Theta} \subset \Theta\)</span> that contains exactly one representative of each equivalence class, for instance the vectors that satisfy an ordering constraint on the state means. The posterior is not genuinely multimodal if, restricted to <span class="math inline">\(\tilde{\Theta}\)</span>, it has a single mode, and it is genuinely multimodal if it has several.</p>
+<p>This formulation shows why the methods of the previous notebook are not enough. An ordering constraint keeps one copy of each class, so if <span class="math inline">\(\mathcal{M}\)</span> contains several classes, several modes remain after imposing it. Post-hoc relabeling algorithms face a similar problem, since they assume that all the modes are relabelings of a single one. Moreover, genuine modes can have different heights and lead to different interpretations of the states, so posterior summaries computed over draws from several genuine modes mix different models.</p>
+</section>
+<section id="when-does-genuine-multimodality-arise-in-hmms" class="level2" data-number="2.5">
+<h2 data-number="2.5" class="anchored" data-anchor-id="when-does-genuine-multimodality-arise-in-hmms"><span class="header-section-number">2.5</span> When does genuine multimodality arise in HMMs?</h2>
+<p><span class="citation" data-cites="grun2009">Grün and Leisch (<a href="#ref-grun2009" role="doc-biblioref">2009</a>)</span> show that genuine multimodality occurs in finite mixture models when different parameterizations induce similar mixture distributions. An HMM whose transition probability matrix has identical rows is a finite mixture, so these results apply to HMMs as a special case. In general, however, the dependence between observations carries additional information about the states, and it is not obvious whether the same phenomenon persists.</p>
+<p>Genuine multimodality in HMMs can arise from two broad sources. The first is uncertainty in the specification of the model. Fitting a number of states different from the one that generated the data is a typical example. With too few states, the model can merge the true states in several different ways, and with too many, it can split them in several different ways. In both cases each arrangement may correspond to a different mode of the posterior. A related situation occurs when some state-dependent distributions are nearly indistinguishable. Even if the number of states is correct, the data provide little information to decide which state explains which observations, and the likelihood may compensate through different values of <span class="math inline">\(\boldsymbol{\Gamma}\)</span>.</p>
+<p>The second source is a limited amount of data, which can produce genuine multimodality even when the model is correctly specified. With few observations, the likelihood is not informative enough to concentrate the posterior around a single equivalence class. In HMMs, the relevant amount of information depends not only on the length of the series but also on how many transitions between states it contains, since a series with very persistent states provides few switches from which to learn <span class="math inline">\(\boldsymbol{\Gamma}\)</span>. Under correct specification, we expect these additional modes to vanish as the number of observations grows, while those caused by misspecification may persist.</p>
+<p>In this notebook we illustrate both sources with simulated data. In the first example the model is misspecified, since we fit an HMM with fewer states than the one that generated the data. In the second example the model is correctly specified, but the series is short, so the data contain little information about the parameters. For this second example we also fit the same model to a longer series, which serves as a reference in which we expect the additional modes to disappear. In <a href="#sec-failures-mcmc" class="quarto-xref">Section&nbsp;3</a> we verify empirically whether each setting produces genuine multimodality and how <em>Stan</em> behaves in its presence.</p>
+</section>
+</section>
+<section id="sec-failures-mcmc" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Examples of failures of general-purpose MCMC methods</h1>
+</section>
+<section id="sec-first-look-pt" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> A first look at parallel tempering</h1>
+</section>
+<section id="final-remarks" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Final remarks</h1>
+</section>
+<section id="references" class="level1" data-number="6">
+
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">6 References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-gallegosherrada2026" class="csl-entry" role="listitem">
+Gallegos-Herrada, Marco A., Vianey Leos-Barajas, and Jeffrey S. Rosenthal. 2026. <span>“Bayesian Inference for Hidden Markov Models Under Genuine Multimodality with Application to Ecological Time Series.”</span> <a href="https://arxiv.org/abs/2604.24587">https://arxiv.org/abs/2604.24587</a>.
+</div>
+<div id="ref-grun2009" class="csl-entry" role="listitem">
+Grün, Bettina, and Friedrich Leisch. 2009. <span>“Dealing with Label Switching in Mixture Models Under Genuine Multimodality.”</span> <em>Journal of Multivariate Analysis</em> 100 (5): 851–61. https://doi.org/<a href="https://doi.org/10.1016/j.jmva.2008.09.006">https://doi.org/10.1016/j.jmva.2008.09.006</a>.
+</div>
+</div></section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
