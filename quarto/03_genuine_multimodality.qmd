@@ -301,13 +301,18 @@ model {
 
 Before sampling from the posterior defined in `03_hmm_misspec_ex1.stan`, we characterize it by searching for its modes. Optimization is cheaper than sampling and, from a given initial value, it climbs to the nearest local maximum of the posterior density. By running the optimizer from many dispersed initial values, we obtain a map of the modes, their heights and how often each one is reached. The modes are a property of the posterior and do not depend on where the optimizer starts, but the mode it reaches does. If all runs end at the same point, this is evidence, although not a proof, that the posterior has a single mode, since a finite number of runs can always miss one. This map will later serve as a reference to judge whether the *Stan* chains explore the whole posterior. 
 
-We generate initial values for all the parameters with prior distributions and then we use the `Optimize` module of Stan. We run $50$ optimizations and  
+We generate dispersed initial values for all the parameters, covering the range of the data for the state means and a wide range of values for the standard deviations, and then run the `optimize` method of *Stan*, which by default uses the *L-BFGS algorithm*. Since the initial values are given explicitly, the optimization is deterministic, and the variation across runs comes only from the starting points. We run $50$ optimizations, round the log posterior density (`lp__`) of each optimum to one decimal and group the runs that reach the same value. For each group we report the average optimized parameters of the state-dependent distributions and the number of runs that reached it.
+
+@tbl-modes-ex1 shows that the optimizer reaches two main modes. In 26 of the 50 runs it reaches a mode with state means $(\mu_1, \mu_2) = (-1.71, 4.12)$ and standard deviations $(\sigma_1, \sigma_2) = (2.24, 0.94)$, in which the first fitted state merges the true states with means $-4$ and $0$. In 12 runs it reaches a mode with state means $(-3.99, 1.85)$ and standard deviations $(0.96, 2.35)$, in which the second fitted state merges the true states with means $0$ and $4$. Both modes satisfy the ordering constraint, and swapping the labels of one does not produce the other, so they belong to different equivalence classes. The posterior is therefore genuinely multimodal, and the two modes give different interpretations of the states.
+
+The two modes differ greatly in height. The log posterior density at the first mode is about $90$ units larger, so the posterior mass around the second mode is negligible. Nevertheless, the optimizer reached the second mode in almost one out of four runs. How often a mode is reached depends on the size of the region of initial values that leads to it, not on its posterior mass. As we show in the next subsection, the same is true for MCMC chains.
+
 
 ```{python}
 from cmdstanpy import CmdStanModel
 import logging
 import pandas as pd
-logging.getLogger("cmdstanpy").setLevel(logging.WARNING)
+logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
 
 # Load and prepare the data
 df_stan = pd.read_csv("../data/03_hmm_3state_ex1.csv")
@@ -342,12 +347,57 @@ for i in range(50):
 df_concat = pd.concat(df_opts).reset_index(drop=True)
 
 # We show results for the emissions
-df_table = df_concat[["mu[1]","mu[2]", "sigma[1]", "sigma[2]","lp__"]]
+df_table = df_concat[["mu[1]","mu[2]", "sigma[1]", "sigma[2]","lp__"]].copy()
 df_table["lp__"] = df_table["lp__"].round(1)
 
-# Summaries of the optimization
+#| label: tbl-modes-ex1
+#| tbl-cap: "Modes found by 50 optimizations from dispersed initial values."
+
 df_sum = df_table.groupby("lp__").mean()
 df_sum.join(df_table["lp__"].value_counts())
+```
+
+To illustrate the consequences for MCMC, we run four *Stan* chains, each starting from a different set of dispersed initial values drawn as in the optimization above. @tbl-chains-ex1 reports, for each chain, the average of its draws. Three chains settle in the dominant mode, with average state means $(\mu_1, \mu_2) = (-1.71, 4.12)$ and state standard deviations $(\sigma_1, \sigma_2) = (2.24, 0.94)$. The remaining chain settles in the second mode, with average state means $(-3.99, 1.85)$ and state standard deviations $(0.97, 2.35)$, and never leaves it. Seen in isolation, every chain looks healthy, with $\hat{R}$ close to $1$ and effective sample sizes of several hundred draws. Nothing in the output of the trapped chain warns that it is exploring a region with negligible posterior mass. We use the same generator seed as in the optimization, so the four chains start from the same initial values as the first four optimization runs.
+
+```{python}
+import arviz as az
+rng = np.random.default_rng(2026)
+
+
+inits_ = [{
+    "mu":np.sort(rng.uniform(-7,7,size=2)),
+    "sigma": rng.uniform(0.5,4,size=2),
+    "gamma": rng.dirichlet(np.ones(2), size=2)
+    } for _ in range(4)]
+
+fit = model.sample(data=stan_data, chains = 4, parallel_chains=4, seed = 0, inits = inits_)
+
+# Here we calculate averages of the draws within each chain
+df_draws = fit.draws_pd()
+
+# We only need these colums
+cols = ["lp__", "mu[1]", "mu[2]", "sigma[1]", "sigma[2]"]
+
+# Calculate posterior
+by_chain = df_draws.groupby("chain__")[cols].mean().round(2)
+
+# We use ArViz to add the R-hat and SSE to the summaries in 'by_chain'
+idata = az.from_cmdstanpy(posterior=fit)
+
+# Diagnostics of each chain in isolation
+diag_by_chain = []
+for k in range(4):
+    summ = az.summary(idata.sel(chain=[k]), var_names=["mu", "sigma"])
+    summ["chain"] = k + 1
+    diag_by_chain.append(summ[["r_hat", "ess_bulk", "ess_tail", "chain"]])
+
+df_diag = pd.concat(diag_by_chain)
+
+# WE add the R-hat and SSE to df 
+df_diag = pd.concat(by_chain)
+df_diag
+
+
 ```
 
 
