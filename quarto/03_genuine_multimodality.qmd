@@ -310,9 +310,13 @@ The two modes differ greatly in height. The log posterior density at the first m
 
 ```{python}
 from cmdstanpy import CmdStanModel
-import logging
 import pandas as pd
-logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
+import logging
+
+# This code is for turning off messages in console
+import cmdstanpy
+cmdstanpy.utils.get_logger().setLevel(logging.ERROR)
+
 
 # Load and prepare the data
 df_stan = pd.read_csv("../data/03_hmm_3state_ex1.csv")
@@ -349,15 +353,17 @@ df_concat = pd.concat(df_opts).reset_index(drop=True)
 # We show results for the emissions
 df_table = df_concat[["mu[1]","mu[2]", "sigma[1]", "sigma[2]","lp__"]].copy()
 df_table["lp__"] = df_table["lp__"].round(1)
+```
 
+```{python}
 #| label: tbl-modes-ex1
 #| tbl-cap: "Modes found by 50 optimizations from dispersed initial values."
 
 df_sum = df_table.groupby("lp__").mean()
-df_sum.join(df_table["lp__"].value_counts())
+df_sum.join(df_table["lp__"].value_counts()).round(2)
 ```
 
-To illustrate the consequences for MCMC, we run four *Stan* chains, each starting from a different set of dispersed initial values drawn as in the optimization above. @tbl-chains-ex1 reports, for each chain, the average of its draws. Three chains settle in the dominant mode, with average state means $(\mu_1, \mu_2) = (-1.71, 4.12)$ and state standard deviations $(\sigma_1, \sigma_2) = (2.24, 0.94)$. The remaining chain settles in the second mode, with average state means $(-3.99, 1.85)$ and state standard deviations $(0.97, 2.35)$, and never leaves it. Seen in isolation, every chain looks healthy, with $\hat{R}$ close to $1$ and effective sample sizes of several hundred draws. Nothing in the output of the trapped chain warns that it is exploring a region with negligible posterior mass. We use the same generator seed as in the optimization, so the four chains start from the same initial values as the first four optimization runs.
+To illustrate the consequences for MCMC, we run four *Stan* chains, each starting from a different set of dispersed initial values drawn as in the optimization above. @tbl-chains-ex1 reports, for each chain, the average of its draws. Three chains settle in the dominant mode, with average state means $(\mu_1, \mu_2) = (-1.71, 4.12)$ and state standard deviations $(\sigma_1, \sigma_2) = (2.24, 0.95)$. The remaining chain settles in the second mode, with average state means $(-3.98, 1.84)$ and state standard deviations $(0.97, 2.35)$, and never leaves it. Seen in isolation, every chain looks healthy, with $\hat{R}$ close to $1$ and effective sample sizes of several hundred draws. Nothing in the output of the trapped chain warns that it is exploring a region with negligible posterior mass. We use the same generator seed as in the optimization, so the four chains start from the same initial values as the first four optimization runs.
 
 ```{python}
 import arviz as az
@@ -375,31 +381,171 @@ fit = model.sample(data=stan_data, chains = 4, parallel_chains=4, seed = 0, init
 # Here we calculate averages of the draws within each chain
 df_draws = fit.draws_pd()
 
-# We only need these colums
+# We only need these columss
 cols = ["lp__", "mu[1]", "mu[2]", "sigma[1]", "sigma[2]"]
 
 # Calculate posterior
 by_chain = df_draws.groupby("chain__")[cols].mean().round(2)
 
-# We use ArViz to add the R-hat and SSE to the summaries in 'by_chain'
+# This code is used for adding the R-hat and ESS of each parameter. ArViz require a minumum of two chains to calculate
+# the R-hat. Stan reports the R-hat for an individual chain by spliting the chain; we use the same philosophy.
 idata = az.from_cmdstanpy(posterior=fit)
 
-# Diagnostics of each chain in isolation
-diag_by_chain = []
+params = ["mu", "sigma"]
+rows = []
+
 for k in range(4):
-    summ = az.summary(idata.sel(chain=[k]), var_names=["mu", "sigma"])
-    summ["chain"] = k + 1
-    diag_by_chain.append(summ[["r_hat", "ess_bulk", "ess_tail", "chain"]])
+    for p in params:
+        draws_k = idata.posterior[p].sel(chain=k).values  # shape (draws, 2)
+        n_half = draws_k.shape[0] // 2
+        for j in range(draws_k.shape[1]):
+            x = draws_k[:, j]
+            split = np.stack([x[:n_half], x[n_half:2 * n_half]])
+            rows.append({
+                "chain": k + 1,
+                "param": f"{p}[{j + 1}]",
+                "r_hat": float(az.rhat(split)),
+                "ess_bulk": float(az.ess(x[np.newaxis, :], method="bulk")),
+            })
 
-df_diag = pd.concat(diag_by_chain)
+    # Log posterior density of chain k
+    x = idata.sample_stats["lp"].sel(chain=k).values  # shape (draws,)
+    n_half = x.shape[0] // 2
+    split = np.stack([x[:n_half], x[n_half:2 * n_half]])
+    rows.append({
+        "chain": k + 1,
+        "param": "lp__",
+        "r_hat": float(az.rhat(split)),
+        "ess_bulk": float(az.ess(x[np.newaxis, :], method="bulk")),
+    })
 
-# WE add the R-hat and SSE to df 
-df_diag = pd.concat(by_chain)
-df_diag
+df_diag = pd.DataFrame(rows)
+
+by_chain_long = by_chain.reset_index().melt(id_vars="chain__", var_name="param", value_name="mean")
+by_chain_long = by_chain_long.rename(columns={"chain__": "chain"})
+by_chain_long["chain"] = by_chain_long["chain"].astype(int)
 
 
 ```
 
+```{python}
+#| label: tbl-chains-ex1
+#| tbl-cap: "Summaries for each chain under different starting values"
+df_chains = by_chain_long.merge(df_diag, on=["chain", "param"], how="left")
+df_chains
+```
+
+However, when we summarize the four chains together, using the `summary` method of CmdStanPy or ArviZ, the picture changes. The posterior means of the state means are $(\mu_1, \mu_2) = (-2.28, 3.55)$, which do not correspond to either mode, and they differ greatly from the posterior medians, a typical sign of a multimodal posterior. Moreover, $\hat{R}$ is above $1.5$ for every parameter and the bulk effective sample size falls below $10$, so the diagnostics clearly flag that the chains disagree.
+
+Running several chains from dispersed initial values therefore reveals the problem, but only if at least one chain happens to start in the region of initial values that leads to a different mode. As models grow in complexity, choosing initial values that cover all these regions becomes increasingly difficult. Even when the disagreement is detected, the chains do not tell us how much posterior mass each mode carries. Pooling them is not a solution, since the proportion of chains in each mode reflects how large the region of initial values leading to it is, and not its posterior mass, which in this example is concentrated almost entirely in the first mode.
+
+```{python}
+#| label: tbl-summary-ex1
+#| tbl-cap: "Posterior summaries of all chains using different starting values"
+#| 
+summary = fit.summary()
+summary
+```
+
+@fig-traces-ex1 shows the traces of the state means $\mu_1$ and $\mu_2$ for the four chains. Three chains explore the same region, while the fourth remains in a different one during all $1000$ iterations, without ever approaching the others. Each trace, seen in isolation, looks like that of a healthy chain, stable and well mixed, suggesting convergence. If only the fourth chain had been run, nothing in this figure would suggest that it is exploring a region with negligible posterior mass.
+
+```{python}
+#| label: fig-traces-ex1
+#| fig-cap: "Traces of the state means using different initial values"
+
+fig, ax = plt.subplots(nrows=2, figsize=(10, 8), sharex=True)
+
+params = ["mu[1]", "mu[2]"]
+labels = ["$\\mu_1$", "$\\mu_2$"]
+colors = ["#ac65c2", "#eba834", "#4c8bb5", "#d1495b"]
+
+for i in range(2):
+    for k in range(1, 5):
+        draws_k = df_draws[df_draws["chain__"] == k]
+        ax[i].plot(
+            draws_k["iter__"],
+            draws_k[params[i]],
+            color=colors[k - 1],
+            linewidth=0.6,
+            alpha=0.8,
+            label=f"Chain {k}",
+        )
+    ax[i].set_ylabel(labels[i])
+    ax[i].spines["top"].set_visible(False)
+    ax[i].spines["right"].set_visible(False)
+    ax[i].grid(True, axis="y", linestyle="--", alpha=0.7)
+    ax[i].set_axisbelow(True)
+
+ax[1].set_xlabel("Iteration")
+ax[0].legend(frameon=False, ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.25))
+fig.tight_layout()
+```
+
+
+To conclude this example, we repeat the sampling with the default initial values of *Stan*, which is what most users do in practice. @tbl-summary-default-ex1 summarizes the four chains together. The first sign of trouble is the log posterior density, whose average is about $-2511$, far below the value of about $-2154$ observed for the chains that reached the dominant mode in the previous run. None of the chains found that mode. Instead, all four settled in a third mode, in which a low-variance state with mean close to $0$ explains the observations of the middle true state, while a high-variance state, also centered near $0$, covers the observations of the two outer true states at once. This is why both state means are close to zero, $(\mu_1, \mu_2) = (-0.06, 0.16)$. The low-variance state has a standard deviation close to $1$, and the high-variance state one close to $3.9$, since it must reach observations near both $-4$ and $4$. However, the average standard deviations reported in the table are equal, $(\sigma_1, \sigma_2) = (2.45, 2.45)$, with $5\%$ and $95\%$ percentiles ranging from about $0.9$ to $4.1$. This happens because two chains assign the low-variance state to the first label and the other two assign it to the second, so the average of each $\sigma_j$ over the four chains is about $(1 + 3.9)/2 \approx 2.45$, a value that no chain actually visits.
+
+```{python}
+# Load and prepare the data
+df_stan = pd.read_csv("../data/03_hmm_3state_ex1.csv")
+
+stan_data = {
+    "T": df_stan.shape[0],
+    "m": 2, # Here we specify fewer states
+    "y": df_stan["y"].to_numpy(),
+}
+
+fit = model.sample(data=stan_data, chains = 4, parallel_chains=4, seed = 0)
+```
+
+```{python}
+#| label: tbl-summary-default-ex1
+#| tbl-cap: "Posterior summaries of all chains"
+#| 
+summary = fit.summary()
+summary
+```
+
+@fig-traces-sigma-default-ex1 shows the traces of the state standard deviations for the four chains. In chains 1 and 4, the first state is the low-variance one, with $\sigma_1$ close to $1$ and $\sigma_2$ close to $3.9$. In chains 2 and 3 the labels are reversed, with $\sigma_1$ close to $3.9$ and $\sigma_2$ close to $1$. No chain ever approaches the average value of $2.45$ reported in @tbl-summary-default-ex1. All four chains therefore describe the same configuration of the states, and they differ only in which label they give to each state. As in the previous run, each trace, seen in isolation, looks like that of a healthy chain.
+
+
+```{python}
+#| label: fig-traces-sigma-default-ex1 
+#| fig-cap: "Traces of the state deviations using default initial values"
+df_draws = fit.draws_pd()
+fig, ax = plt.subplots(nrows=2, figsize=(10, 8), sharex=True)
+
+params = ["sigma[1]", "sigma[2]"]
+labels = ["$\\sigma_1$", "$\\sigma_2$"]
+colors = ["#ac65c2", "#eba834", "#4c8bb5", "#d1495b"]
+
+for i in range(2):
+    for k in range(1, 5):
+        draws_k = df_draws[df_draws["chain__"] == k]
+        ax[i].plot(
+            draws_k["iter__"],
+            draws_k[params[i]],
+            color=colors[k - 1],
+            linewidth=0.6,
+            alpha=0.8,
+            label=f"Chain {k}",
+        )
+    ax[i].set_ylabel(labels[i])
+    ax[i].spines["top"].set_visible(False)
+    ax[i].spines["right"].set_visible(False)
+    ax[i].grid(True, axis="y", linestyle="--", alpha=0.7)
+    ax[i].set_axisbelow(True)
+
+ax[1].set_xlabel("Iteration")
+ax[0].legend(frameon=False, ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.25))
+fig.tight_layout()
+```
+
+
+Now, let's see what happens when we use a correct specification of the model, but we only have a reduced set of information.
+
+## Example 2. Correct specification with short data
+
+In this example we use a short sample of the simulated data in the previous example. 
 
 # A first look at parallel tempering {#sec-first-look-pt}
 
